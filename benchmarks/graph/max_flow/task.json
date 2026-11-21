@@ -35,12 +35,12 @@
     {
       "name": "dinic_worst_small",
       "generator": "dinic_worst.cpp",
-      "args": ["40", "40", "20"]
+      "args": ["100", "100", "90"]
     },
     {
       "name": "dinic_worst_large",
       "generator": "dinic_worst.cpp",
-      "args": ["300", "300", "200"]
+      "args": ["10000", "10000", "20"]
     },
     {
       "name": "iter_killer",
