@@ -26,6 +26,16 @@
       "name": "deep_tree_large",
       "generator": "deep_tree.cpp",
       "args": ["524288", "2000000"]
+    },
+    {
+      "name": "path_small",
+      "generator": "path.cpp",
+      "args": ["2000", "8000"]
+    },
+    {
+      "name": "path_large",
+      "generator": "path.cpp",
+      "args": ["500000", "2000000"]
     }
   ]
 }
