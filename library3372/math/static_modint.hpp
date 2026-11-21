@@ -69,7 +69,7 @@ template <int m> class StaticModInt {
   constexpr StaticModInt pow(long long n) const {
     assert(n >= 0);
     StaticModInt x = *this;
-    StaticModInt res = raw(1 % m);
+    StaticModInt res(1);
     while (n > 0) {
       if (n & 1) res *= x;
       x *= x;
