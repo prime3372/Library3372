@@ -4,6 +4,7 @@
 import argparse
 import json
 import math
+import resource
 import statistics
 import subprocess
 import sys
@@ -195,6 +196,13 @@ def load_task_config(
     return runs, float(timeout_sec), cases
 
 
+def unlimit_stack() -> None:
+    """Raise stack size limit to the hard limit for deep recursion in solutions."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_STACK)
+    if soft != hard:
+        resource.setrlimit(resource.RLIMIT_STACK, (hard, hard))
+
+
 def generate_cases(
     cases: list[CaseSpec],
     bin_dir: Path,
@@ -223,6 +231,7 @@ def generate_cases(
                     stderr=subprocess.PIPE,
                     cwd=temp_cwd,
                     timeout=timeout_sec,
+                    preexec_fn=unlimit_stack,
                 )
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(f"Generator timed out for case {case.name!r} after {timeout_sec}s") from exc
@@ -258,6 +267,7 @@ def run_solution_on_case(
                     capture_output=True,
                     text=True,
                     timeout=timeout_sec,
+                    preexec_fn=unlimit_stack,
                 )
         except subprocess.TimeoutExpired:
             return CaseSolResult("TLE", f">{timeout_sec:g}s on run {run_idx + 1}", None, {})
