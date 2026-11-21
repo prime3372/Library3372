@@ -1,0 +1,9 @@
+BasedOnStyle: Google
+IndentWidth: 2
+AccessModifierOffset: -1
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: false
+ColumnLimit: 80
+ReflowComments: false
