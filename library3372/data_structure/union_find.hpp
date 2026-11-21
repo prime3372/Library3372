@@ -27,14 +27,14 @@ class UnionFind {
 
   int find(int x) {
     assert(0 <= x && x < (int)parent_or_size_.size());
-    return find_unchecked(x);
+    return find_internal(x);
   }
 
   std::optional<std::pair<int, int>> unite(int x, int y) {
     assert(0 <= x && x < (int)parent_or_size_.size());
     assert(0 <= y && y < (int)parent_or_size_.size());
-    x = find_unchecked(x);
-    y = find_unchecked(y);
+    x = find_internal(x);
+    y = find_internal(y);
     if (x == y) return std::nullopt;
     if (parent_or_size_[x] > parent_or_size_[y]) std::swap(x, y);
     parent_or_size_[x] += parent_or_size_[y];
@@ -46,12 +46,12 @@ class UnionFind {
   bool same(int x, int y) {
     assert(0 <= x && x < (int)parent_or_size_.size());
     assert(0 <= y && y < (int)parent_or_size_.size());
-    return find_unchecked(x) == find_unchecked(y);
+    return find_internal(x) == find_internal(y);
   }
 
   int size(int x) {
     assert(0 <= x && x < (int)parent_or_size_.size());
-    return -parent_or_size_[find_unchecked(x)];
+    return -parent_or_size_[find_internal(x)];
   }
 
   int count_groups() const { return count_groups_; }
@@ -62,7 +62,7 @@ class UnionFind {
     std::vector<std::vector<int>> result(count_groups_);
     int next_id = 0;
     for (int i = 0; i < n; ++i) {
-      int r = find_unchecked(i);
+      int r = find_internal(i);
       int id = group_id[r];
       if (id == -1) {
         id = group_id[r] = next_id++;
@@ -74,7 +74,7 @@ class UnionFind {
   }
 
  private:
-  int find_unchecked(int x) {
+  int find_internal(int x) {
     int p = parent_or_size_[x];
     if (p < 0) return x;
     int r = p;
