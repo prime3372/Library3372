@@ -333,6 +333,51 @@ void test_special_and_boundary_cases() {
     assert(cut[0] && !cut[n - 1]);
   }
 
+  // Dinic worst-case graph triggering fallback, including flow_limit and
+  // trapped excess return.
+  {
+    constexpr int k = 30;
+    constexpr int chain_len = 30;
+    constexpr int p = 30;
+    constexpr int inf = 1000000000;
+    int n = 2 * k + chain_len + 3;
+    int s = 0;
+    int dead = n - 2;
+    int t = n - 1;
+    int x_base = 1;
+    int c_base = 1 + k;
+    int y_base = 1 + k + chain_len;
+
+    MaxFlow<int> mf(n);
+    std::vector<std::pair<std::pair<int, int>, int>> added;
+    auto push_e = [&](int u, int v, int c) {
+      mf.add_edge(u, v, c);
+      added.push_back({{u, v}, c});
+    };
+
+    for (int r = 0; r < k; ++r) push_e(s, x_base + r, p);
+    for (int r = 1; r < k; ++r) push_e(x_base + r, x_base + r - 1, inf);
+    push_e(x_base, c_base, inf);
+    for (int i = 0; i + 1 < chain_len; ++i)
+      push_e(c_base + i, c_base + i + 1, inf);
+    push_e(c_base + chain_len - 1, y_base, inf);
+    for (int r = 0; r + 1 < k; ++r) push_e(y_base + r, y_base + r + 1, inf);
+    for (int r = 0; r < k; ++r) {
+      for (int j = 0; j < p; ++j) push_e(y_base + r, t, 1);
+    }
+    // Dead-end branch with tiny sink capacity and self-loop to exercise Phase 2.
+    push_e(s, dead, inf);
+    push_e(dead, t, 1);
+    push_e(c_base, c_base, inf);
+
+    int f1 = mf.flow(s, t, 450);
+    assert(f1 == 450);
+    verify_flow_and_cut(n, s, t, added, mf, f1, false);
+    int f2 = mf.flow(s, t);
+    assert(f1 + f2 == k * p + 1);
+    verify_flow_and_cut(n, s, t, added, mf, f1 + f2, true);
+  }
+
   // Large capacities at INT_MAX / LLONG_MAX / ULLONG_MAX / __int128 limits.
   {
     MaxFlow<int> mf_i(3);
