@@ -27,8 +27,6 @@ template <int m> class StaticModInt {
   template <typename T>
     requires internal::is_integer_v<T>
   static constexpr StaticModInt raw(T v) {
-    if constexpr (internal::is_signed_integer_v<T>) assert(v >= 0);
-    assert((unsigned __int128)v < (unsigned __int128)m);
     StaticModInt res;
     res.val_ = (unsigned int)v;
     return res;
