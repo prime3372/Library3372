@@ -1,0 +1,56 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["500", "3000", "1000000"]
+    },
+    {
+      "name": "random_sparse",
+      "generator": "random.cpp",
+      "args": ["20000", "100000", "1000000"]
+    },
+    {
+      "name": "random_dense",
+      "generator": "random.cpp",
+      "args": ["2000", "200000", "1000000"]
+    },
+    {
+      "name": "bipartite_unit",
+      "generator": "bipartite.cpp",
+      "args": ["50000", "50000", "250000"]
+    },
+    {
+      "name": "grid_300x300",
+      "generator": "grid.cpp",
+      "args": ["300", "300", "1000"]
+    },
+    {
+      "name": "layered_deep",
+      "generator": "layered_deep.cpp",
+      "args": ["10000", "4", "1000"]
+    },
+    {
+      "name": "dinic_worst_small",
+      "generator": "dinic_worst.cpp",
+      "args": ["40", "40", "20"]
+    },
+    {
+      "name": "dinic_worst_large",
+      "generator": "dinic_worst.cpp",
+      "args": ["300", "300", "200"]
+    },
+    {
+      "name": "iter_killer",
+      "generator": "iter_killer.cpp",
+      "args": ["20000", "40000"]
+    },
+    {
+      "name": "push_back_killer",
+      "generator": "push_back_killer.cpp",
+      "args": ["400", "1000000000"]
+    }
+  ]
+}
