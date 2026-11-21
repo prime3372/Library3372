@@ -18,7 +18,7 @@
 
 namespace library3372 {
 
-// Dinic's algorithm with HLPP fallback
+// Dinic's algorithm and HLPP fallback
 // https://en.wikipedia.org/wiki/Dinic%27s_algorithm
 // https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 template <typename Cap>
@@ -35,35 +35,36 @@ class MaxFlow {
 
   MaxFlow() = default;
 
-  explicit MaxFlow(int n) {
-    assert(n >= 0);
-    g_.resize(n);
-  }
+  explicit MaxFlow(int n) : n_(n) { assert(n >= 0); }
 
   int add_edge(int from, int to, Cap cap) {
-    int n = (int)g_.size();
-    assert(0 <= from && from < n);
-    assert(0 <= to && to < n);
+    assert(0 <= from && from < n_);
+    assert(0 <= to && to < n_);
     if constexpr (internal::is_signed_integer_v<Cap>) assert(cap >= 0);
-    int m = (int)pos_.size();
-    int from_id = (int)g_[from].size();
-    int to_id = (int)g_[to].size();
-    if (from == to) ++to_id;
-    pos_.emplace_back(from, from_id);
-    g_[from].push_back({to, to_id, cap});
-    g_[to].push_back({from, from_id, 0});
-    return m;
+    if (!dirty_) sync_flows();
+    int id = (int)edges_.size();
+    edges_.push_back({from, to, cap, 0});
+    if (cap > 1) all_unit_ = false;
+    dirty_ = true;
+    return id;
   }
 
   Edge get_edge(int i) const {
-    assert(0 <= i && i < (int)pos_.size());
-    const InternalEdge& e = g_[pos_[i].first][pos_[i].second];
-    const InternalEdge& re = g_[e.to][e.rev];
-    return Edge{pos_[i].first, e.to, (Cap)(e.cap + re.cap), re.cap};
+    assert(0 <= i && i < (int)edges_.size());
+    Edge e = edges_[i];
+    if (!dirty_) {
+      if (csr_is_unit_) {
+        e.flow = (Cap)(e.cap - (Cap)(ulist_[edge_pos_[i]].rev_cap & 1U));
+      } else {
+        e.flow = (Cap)(e.cap - elist_[edge_pos_[i]].cap);
+      }
+    }
+    return e;
   }
 
   std::vector<Edge> edges() const {
-    int m = (int)pos_.size();
+    if (dirty_) return edges_;
+    int m = (int)edges_.size();
     std::vector<Edge> result;
     result.reserve(m);
     for (int i = 0; i < m; ++i) result.push_back(get_edge(i));
@@ -73,16 +74,207 @@ class MaxFlow {
   Cap flow(int s, int t) { return flow(s, t, std::numeric_limits<Cap>::max()); }
 
   Cap flow(int s, int t, Cap flow_limit) {
-    int n = (int)g_.size();
-    assert(0 <= s && s < n);
-    assert(0 <= t && t < n);
+    assert(0 <= s && s < n_);
+    assert(0 <= t && t < n_);
     assert(s != t);
     if constexpr (internal::is_signed_integer_v<Cap>) assert(flow_limit >= 0);
+    if (flow_limit == 0) return 0;
 
-    std::vector<int> level(n);
-    std::vector<int> iter(n);
+    if (dirty_ || start_.empty()) build_csr();
+    if (csr_is_unit_) return flow_unit(s, t, flow_limit);
+    return flow_general(s, t, flow_limit);
+  }
+
+  std::vector<bool> min_cut(int s) const {
+    assert(0 <= s && s < n_);
+    std::vector<bool> visited(n_, false);
     std::vector<int> que;
-    long long nm = (long long)n + (long long)pos_.size();
+    visited[s] = true;
+    que.push_back(s);
+
+    if (!dirty_ && csr_is_unit_) {
+      for (int head = 0; head < (int)que.size(); ++head) {
+        int v = que[head];
+        for (int i = start_[v], end = start_[v + 1]; i < end; ++i) {
+          const UnitEdge& e = ulist_[i];
+          if ((e.rev_cap & 1U) && !visited[e.to]) {
+            visited[e.to] = true;
+            que.push_back(e.to);
+          }
+        }
+      }
+      return visited;
+    }
+
+    if (!dirty_) {
+      for (int head = 0; head < (int)que.size(); ++head) {
+        int v = que[head];
+        for (int i = start_[v], end = start_[v + 1]; i < end; ++i) {
+          const GeneralEdge& e = elist_[i];
+          if (e.cap > 0 && !visited[e.to]) {
+            visited[e.to] = true;
+            que.push_back(e.to);
+          }
+        }
+      }
+      return visited;
+    }
+
+    std::vector<std::vector<int>> adj(n_);
+    for (const Edge& e : edges_) {
+      if (e.cap - e.flow > 0) adj[e.from].push_back(e.to);
+      if (e.flow > 0) adj[e.to].push_back(e.from);
+    }
+    for (int head = 0; head < (int)que.size(); ++head) {
+      for (int to : adj[que[head]]) {
+        if (!visited[to]) {
+          visited[to] = true;
+          que.push_back(to);
+        }
+      }
+    }
+    return visited;
+  }
+
+ private:
+  struct GeneralEdge {
+    int to;
+    int rev;
+    Cap cap;
+  };
+
+  struct UnitEdge {
+    int to;
+    unsigned int rev_cap;
+  };
+
+  void build_csr() {
+    int m = (int)edges_.size();
+    start_.assign(n_ + 1, 0);
+    for (const Edge& e : edges_) {
+      ++start_[e.from + 1];
+      ++start_[e.to + 1];
+    }
+    for (int i = 0; i < n_; ++i) start_[i + 1] += start_[i];
+
+    std::vector<int> cur = start_;
+    edge_pos_.resize(m);
+    if (all_unit_) {
+      elist_.clear();
+      ulist_.resize(2 * m);
+      for (int i = 0; i < m; ++i) {
+        const Edge& e = edges_[i];
+        int ui = cur[e.from]++;
+        int vi = cur[e.to]++;
+        edge_pos_[i] = ui;
+        ulist_[ui] = {e.to,
+                      ((unsigned int)vi << 1) | (unsigned int)(e.cap - e.flow)};
+        ulist_[vi] = {e.from, ((unsigned int)ui << 1) | (unsigned int)e.flow};
+      }
+      csr_is_unit_ = true;
+    } else {
+      ulist_.clear();
+      elist_.resize(2 * m);
+      for (int i = 0; i < m; ++i) {
+        const Edge& e = edges_[i];
+        int ui = cur[e.from]++;
+        int vi = cur[e.to]++;
+        edge_pos_[i] = ui;
+        elist_[ui] = {e.to, vi, (Cap)(e.cap - e.flow)};
+        elist_[vi] = {e.from, ui, e.flow};
+      }
+      csr_is_unit_ = false;
+    }
+    dirty_ = false;
+  }
+
+  void sync_flows() {
+    int m = (int)edges_.size();
+    if (csr_is_unit_) {
+      for (int i = 0; i < m; ++i) {
+        Cap rem = (Cap)(ulist_[edge_pos_[i]].rev_cap & 1U);
+        edges_[i].flow = (Cap)(edges_[i].cap - rem);
+      }
+    } else {
+      for (int i = 0; i < m; ++i) {
+        edges_[i].flow = (Cap)(edges_[i].cap - elist_[edge_pos_[i]].cap);
+      }
+    }
+  }
+
+  Cap flow_unit(int s, int t, Cap flow_limit) {
+    std::vector<int> level(n_);
+    std::vector<int> iter(n_);
+    std::vector<int> que(n_);
+
+    auto bfs = [&]() {
+      std::fill(level.begin(), level.end(), -1);
+      level[s] = 0;
+      int qh = 0;
+      int qt = 0;
+      que[qt++] = s;
+      while (qh < qt) {
+        int v = que[qh++];
+        int next_level = level[v] + 1;
+        for (int i = start_[v], end = start_[v + 1]; i < end; ++i) {
+          const UnitEdge& e = ulist_[i];
+          if ((e.rev_cap & 1U) == 0 || level[e.to] >= 0) continue;
+          level[e.to] = next_level;
+          if (e.to == t) return;
+          que[qt++] = e.to;
+        }
+      }
+    };
+
+    auto dfs = [&](auto& self, int v) -> bool {
+      if (v == s) return true;
+      int target_level = level[v] - 1;
+      for (int &i = iter[v], end = start_[v + 1]; i < end;) {
+        UnitEdge& e = ulist_[i];
+        ++i;
+        if (level[e.to] == target_level) {
+          unsigned int rev = e.rev_cap >> 1;
+          if ((ulist_[rev].rev_cap & 1U) && self(self, e.to)) {
+            e.rev_cap |= 1U;
+            ulist_[rev].rev_cap &= ~1U;
+            return true;
+          }
+        }
+      }
+      level[v] = n_;
+      return false;
+    };
+
+    Cap flow = 0;
+    while (flow < flow_limit) {
+      bfs();
+      if (level[t] == -1) break;
+      std::copy(start_.begin(), start_.begin() + n_, iter.begin());
+      int target_level = level[t] - 1;
+      Cap pushed = 0;
+      for (int i = start_[t], end = start_[t + 1];
+           i < end && flow + pushed < flow_limit; ++i) {
+        UnitEdge& e = ulist_[i];
+        if (level[e.to] == target_level) {
+          unsigned int rev = e.rev_cap >> 1;
+          if ((ulist_[rev].rev_cap & 1U) && dfs(dfs, e.to)) {
+            e.rev_cap |= 1U;
+            ulist_[rev].rev_cap &= ~1U;
+            ++pushed;
+          }
+        }
+      }
+      if (pushed == 0) break;
+      flow = (Cap)(flow + pushed);
+    }
+    return flow;
+  }
+
+  Cap flow_general(int s, int t, Cap flow_limit) {
+    std::vector<int> level(n_);
+    std::vector<int> iter(n_);
+    std::vector<int> que(n_);
+    long long nm = (long long)n_ + (long long)edges_.size();
     long long dfs_calls = 0;
     int phases = 0;
     bool hit_limit = false;
@@ -90,16 +282,18 @@ class MaxFlow {
     auto bfs = [&]() {
       std::fill(level.begin(), level.end(), -1);
       level[s] = 0;
-      que.clear();
-      que.push_back(s);
-      for (int head = 0; head < (int)que.size(); ++head) {
-        int v = que[head];
+      int qh = 0;
+      int qt = 0;
+      que[qt++] = s;
+      while (qh < qt) {
+        int v = que[qh++];
         int next_level = level[v] + 1;
-        for (const InternalEdge& e : g_[v]) {
+        for (int i = start_[v], end = start_[v + 1]; i < end; ++i) {
+          const GeneralEdge& e = elist_[i];
           if (e.cap == 0 || level[e.to] >= 0) continue;
           level[e.to] = next_level;
           if (e.to == t) return;
-          que.push_back(e.to);
+          que[qt++] = e.to;
         }
       }
     };
@@ -112,23 +306,25 @@ class MaxFlow {
       }
       Cap res = 0;
       int target_level = level[v] - 1;
-      int deg = (int)g_[v].size();
-      for (int& i = iter[v]; i < deg; ++i) {
-        InternalEdge& e = g_[v][i];
+      for (int &i = iter[v], end = start_[v + 1]; i < end; ++i) {
+        GeneralEdge& e = elist_[i];
         if (level[e.to] != target_level) continue;
-        Cap rev_cap = g_[e.to][e.rev].cap;
+        Cap rev_cap = elist_[e.rev].cap;
         if (rev_cap == 0) continue;
         Cap rem = (Cap)(up - res);
         Cap d = self(self, e.to, rem < rev_cap ? rem : rev_cap);
         if (d > 0) {
           e.cap = (Cap)(e.cap + d);
-          g_[e.to][e.rev].cap = (Cap)(g_[e.to][e.rev].cap - d);
+          elist_[e.rev].cap = (Cap)(elist_[e.rev].cap - d);
           res = (Cap)(res + d);
-          if (res == up) return res;
+          if (res == up) {
+            if (d == rev_cap) ++i;
+            return res;
+          }
         }
         if (hit_limit) return res;
       }
-      level[v] = n;
+      level[v] = n_;
       return res;
     };
 
@@ -137,7 +333,7 @@ class MaxFlow {
       bfs();
       if (level[t] == -1) break;
       ++phases;
-      std::fill(iter.begin(), iter.end(), 0);
+      std::copy(start_.begin(), start_.begin() + n_, iter.begin());
       Cap f = dfs(dfs, t, (Cap)(flow_limit - flow));
       flow = (Cap)(flow + f);
       if (hit_limit) {
@@ -149,55 +345,53 @@ class MaxFlow {
     return flow;
   }
 
-  std::vector<bool> min_cut(int s) const {
-    int n = (int)g_.size();
-    assert(0 <= s && s < n);
-    std::vector<bool> visited(n, false);
-    std::vector<int> que;
-    visited[s] = true;
-    que.push_back(s);
-    for (int head = 0; head < (int)que.size(); ++head) {
-      int v = que[head];
-      for (const InternalEdge& e : g_[v]) {
-        if (e.cap > 0 && !visited[e.to]) {
-          visited[e.to] = true;
-          que.push_back(e.to);
-        }
-      }
-    }
-    return visited;
-  }
-
- private:
-  struct InternalEdge {
-    int to;
-    int rev;
-    Cap cap;
-  };
-
   Cap hlpp_rem(int orig_s, int t, Cap rem_limit) {
     if (rem_limit == 0) return 0;
-    int orig_n = (int)g_.size();
-    int vs = orig_n;
-    int n = orig_n + 1;
-    g_.emplace_back();
-    int orig_s_rev = (int)g_[orig_s].size();
-    g_[vs].push_back({orig_s, orig_s_rev, rem_limit});
-    g_[orig_s].push_back({vs, 0, 0});
-
+    int n = n_;
     std::vector<Cap> ex(n, 0);
     std::vector<int> h(n, n);
     std::vector<int> gap(n + 1, 0);
-    std::vector<int> arc(n, 0);
+    std::vector<int> arc(start_.begin(), start_.begin() + n);
     std::vector<int> que(n);
     std::vector<std::vector<int>> buckets(n);
     int max_h = 0;
+    Cap vs_pushed = 0;
 
     auto global_relabel = [&](int target, int forbidden, bool use_gap) {
       std::fill(h.begin(), h.end(), n);
       if (use_gap) std::fill(gap.begin(), gap.end(), 0);
-      std::fill(arc.begin(), arc.end(), 0);
+      std::copy(start_.begin(), start_.begin() + n, arc.begin());
       for (int i = 0; i < n; ++i) buckets[i].clear();
+      if (target == -1) {
+        if (vs_pushed > 0) {
+          h[orig_s] = 1;
+          int qh = 0;
+          int qt = 0;
+          que[qt++] = orig_s;
+          if (ex[orig_s] > 0) {
+            buckets[1].push_back(orig_s);
+            max_h = 1;
+          }
+          while (qh < qt) {
+            int u = que[qh++];
+            int nh = h[u] + 1;
+            if (nh >= n) continue;
+            for (int i = start_[u], end = start_[u + 1]; i < end; ++i) {
+              const GeneralEdge& e = elist_[i];
+              if (e.to == t) continue;
+              if (h[e.to] == n && elist_[e.rev].cap > 0) {
+                h[e.to] = nh;
+                if (ex[e.to] > 0) {
+                  buckets[nh].push_back(e.to);
+                  if (nh > max_h) max_h = nh;
+                }
+                que[qt++] = e.to;
+              }
+            }
+          }
+        }
+        return;
+      }
       h[target] = 0;
       int qh = 0;
       int qt = 0;
@@ -207,9 +401,10 @@ class MaxFlow {
         int u = que[qh++];
         int nh = h[u] + 1;
         if (nh >= n) continue;
-        for (const InternalEdge& e : g_[u]) {
+        for (int i = start_[u], end = start_[u + 1]; i < end; ++i) {
+          const GeneralEdge& e = elist_[i];
           if (e.to == forbidden) continue;
-          if (h[e.to] == n && g_[e.to][e.rev].cap > 0) {
+          if (h[e.to] == n && elist_[e.rev].cap > 0) {
             h[e.to] = nh;
             if (use_gap) ++gap[nh];
             if (e.to != target && ex[e.to] > 0) {
@@ -233,12 +428,18 @@ class MaxFlow {
         if (ex[u] == 0 || h[u] >= n) continue;
 
         while (ex[u] > 0) {
-          if (arc[u] < (int)g_[u].size()) {
-            InternalEdge& e = g_[u][arc[u]];
+          if (target == -1 && u == orig_s && h[orig_s] == 1 && vs_pushed > 0) {
+            Cap d = ex[u] < vs_pushed ? ex[u] : vs_pushed;
+            vs_pushed = (Cap)(vs_pushed - d);
+            ex[u] = (Cap)(ex[u] - d);
+            if (ex[u] == 0) break;
+          }
+          if (arc[u] < start_[u + 1]) {
+            GeneralEdge& e = elist_[arc[u]];
             if (e.cap > 0 && h[u] == h[e.to] + 1) {
               Cap d = ex[u] < e.cap ? ex[u] : e.cap;
               e.cap = (Cap)(e.cap - d);
-              g_[e.to][e.rev].cap = (Cap)(g_[e.to][e.rev].cap + d);
+              elist_[e.rev].cap = (Cap)(elist_[e.rev].cap + d);
               ex[u] = (Cap)(ex[u] - d);
               if (e.to != target && e.to != forbidden && ex[e.to] == 0 &&
                   h[e.to] < n) {
@@ -253,7 +454,7 @@ class MaxFlow {
               int old_h = h[u];
               --gap[old_h];
               if (gap[old_h] == 0) {
-                for (int v = 0; v < orig_n; ++v) {
+                for (int v = 0; v < n; ++v) {
                   if (old_h < h[v] && h[v] < n) {
                     --gap[h[v]];
                     h[v] = n;
@@ -264,13 +465,17 @@ class MaxFlow {
               }
             }
             int min_nh = n;
-            for (const InternalEdge& e : g_[u]) {
+            for (int i = start_[u], end = start_[u + 1]; i < end; ++i) {
+              const GeneralEdge& e = elist_[i];
               if (e.to != u && e.cap > 0 && h[e.to] + 1 < min_nh) {
                 min_nh = h[e.to] + 1;
               }
             }
+            if (target == -1 && u == orig_s && vs_pushed > 0 && 1 < min_nh) {
+              min_nh = 1;
+            }
             h[u] = min_nh;
-            arc[u] = 0;
+            arc[u] = start_[u];
             ++relabels;
             if (min_nh < n) {
               if (use_gap) ++gap[min_nh];
@@ -288,30 +493,30 @@ class MaxFlow {
       }
     };
 
-    global_relabel(t, vs, true);
-    h[vs] = n;
+    global_relabel(t, -1, true);
     if (h[orig_s] < n) {
-      InternalEdge& e = g_[vs][0];
-      Cap d = e.cap;
-      e.cap = 0;
-      g_[orig_s][e.rev].cap = (Cap)(g_[orig_s][e.rev].cap + d);
+      vs_pushed = rem_limit;
+      ex[orig_s] = rem_limit;
       buckets[h[orig_s]].push_back(orig_s);
       if (h[orig_s] > max_h) max_h = h[orig_s];
-      ex[orig_s] = d;
+      run_phase(t, -1, true);
     }
-    run_phase(t, vs, true);
 
     Cap pushed = ex[t];
-    global_relabel(vs, t, false);
-    run_phase(vs, t, false);
-
-    g_[orig_s].pop_back();
-    g_.pop_back();
+    global_relabel(-1, t, false);
+    run_phase(-1, t, false);
     return pushed;
   }
 
-  std::vector<std::pair<int, int>> pos_;
-  std::vector<std::vector<InternalEdge>> g_;
+  int n_ = 0;
+  bool all_unit_ = true;
+  bool dirty_ = true;
+  bool csr_is_unit_ = false;
+  std::vector<Edge> edges_;
+  std::vector<int> start_;
+  std::vector<int> edge_pos_;
+  std::vector<GeneralEdge> elist_;
+  std::vector<UnitEdge> ulist_;
 };
 
 }  // namespace library3372

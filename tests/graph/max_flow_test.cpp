@@ -304,8 +304,27 @@ void test_special_and_boundary_cases() {
     MaxFlow<int> mf(4);
     mf.add_edge(0, 1, 100);
     mf.add_edge(2, 3, 100);
+    assert((mf.min_cut(0) == std::vector<bool>{true, true, false, false}));
     assert(mf.flow(0, 3) == 0);
     assert((mf.min_cut(0) == std::vector<bool>{true, true, false, false}));
+  }
+
+  // Unit-capacity partial flow, min_cut while dirty, then upgrading to > 1 cap.
+  {
+    MaxFlow<int> mf(4);
+    std::vector<std::pair<std::pair<int, int>, int>> added = {
+        {{0, 1}, 1}, {{0, 2}, 1}, {{1, 3}, 1}, {{2, 3}, 1}, {{1, 2}, 0}};
+    for (const auto& [uv, c] : added) mf.add_edge(uv.first, uv.second, c);
+    assert(mf.flow(0, 3, 1) == 1);
+    verify_flow_and_cut(4, 0, 3, added, mf, 1, false);
+    assert(mf.flow(0, 3) == 1);
+    verify_flow_and_cut(4, 0, 3, added, mf, 2, true);
+
+    mf.add_edge(0, 3, 5);
+    added.push_back({{0, 3}, 5});
+    assert((mf.min_cut(0) == std::vector<bool>{true, true, true, true}));
+    assert(mf.flow(0, 3) == 5);
+    verify_flow_and_cut(4, 0, 3, added, mf, 7, true);
   }
 
   // Self-loops, zero-capacity edges, and parallel edges.
