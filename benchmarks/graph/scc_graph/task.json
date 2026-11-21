@@ -1,0 +1,31 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["1500", "6000"]
+    },
+    {
+      "name": "random_sparse_large",
+      "generator": "random.cpp",
+      "args": ["500000", "500000"]
+    },
+    {
+      "name": "random_dense_large",
+      "generator": "random.cpp",
+      "args": ["500000", "2000000"]
+    },
+    {
+      "name": "path_cycle_small",
+      "generator": "path_cycle.cpp",
+      "args": ["1500", "30"]
+    },
+    {
+      "name": "path_cycle_large",
+      "generator": "path_cycle.cpp",
+      "args": ["500000", "1000"]
+    }
+  ]
+}
