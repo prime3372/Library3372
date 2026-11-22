@@ -7,6 +7,10 @@
 #ifndef LIBRARY3372_LIBRARY3372_STRING_SUFFIX_ARRAY_HPP_
 #define LIBRARY3372_LIBRARY3372_STRING_SUFFIX_ARRAY_HPP_
 
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -47,6 +51,254 @@ template <typename T> inline void sa_naive(const T* s, int n, int* sa) {
   }
 }
 
+#ifdef __AVX2__
+struct CompressTable {
+  unsigned char idx[256][8];
+  constexpr CompressTable() : idx{} {
+    for (int mask = 0; mask < 256; ++mask) {
+      int k = 0;
+      for (int b = 0; b < 8; ++b) {
+        if ((mask >> b) & 1) idx[mask][k++] = (unsigned char)b;
+      }
+    }
+  }
+};
+
+inline constexpr CompressTable kCompressTable{};
+
+inline void set_buckets(const int* cnt, int* bkt, int upper, bool end) {
+  if (upper < 64) {
+    int sum = 0;
+    if (end) {
+      for (int i = 0; i <= upper; ++i) {
+        sum += cnt[i];
+        bkt[i] = sum;
+      }
+    } else {
+      for (int i = 0; i <= upper; ++i) {
+        bkt[i] = sum;
+        sum += cnt[i];
+      }
+    }
+    return;
+  }
+  int n = upper + 1;
+  int i = 0;
+  __m256i carry = _mm256_setzero_si256();
+  for (; i + 8 <= n; i += 8) {
+    __m256i x = _mm256_loadu_si256((const __m256i*)(cnt + i));
+    __m256i s = _mm256_add_epi32(x, _mm256_slli_si256(x, 4));
+    s = _mm256_add_epi32(s, _mm256_slli_si256(s, 8));
+    __m256i lo_last = _mm256_permute2x128_si256(s, s, 0x08);
+    lo_last = _mm256_shuffle_epi32(lo_last, 0xFF);
+    s = _mm256_add_epi32(s, lo_last);
+    __m256i inc = _mm256_add_epi32(s, carry);
+    __m256i res = end ? inc : _mm256_sub_epi32(inc, x);
+    _mm256_storeu_si256((__m256i*)(bkt + i), res);
+    __m256i hi = _mm256_permute2x128_si256(inc, inc, 0x11);
+    carry = _mm256_shuffle_epi32(hi, 0xFF);
+  }
+  int sum = _mm256_cvtsi256_si32(carry);
+  if (end) {
+    for (; i < n; ++i) {
+      sum += cnt[i];
+      bkt[i] = sum;
+    }
+  } else {
+    for (; i < n; ++i) {
+      bkt[i] = sum;
+      sum += cnt[i];
+    }
+  }
+}
+
+template <typename CharT, typename FBlock, typename FTail>
+inline void scan_lms_blocks_avx2(const CharT* s, int n, FBlock&& fn_block,
+                                 FTail&& fn_tail) {
+  int i = n - 2;
+  unsigned int prev_s = 0;
+  if constexpr (sizeof(CharT) == 1) {
+    if (i >= 31) {
+      const __m256i bias = _mm256_set1_epi8((char)0x80);
+      const __m256i rev16 = _mm256_setr_epi8(
+          15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12,
+          11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+      for (; i >= 31; i -= 32) {
+        int base = i - 31;
+        __m256i v_cur = _mm256_loadu_si256((const __m256i*)(s + base));
+        __m256i v_next = _mm256_loadu_si256((const __m256i*)(s + base + 1));
+        __m256i v_eq = _mm256_cmpeq_epi8(v_cur, v_next);
+        __m256i v_gt = _mm256_cmpgt_epi8(_mm256_xor_si256(v_next, bias),
+                                         _mm256_xor_si256(v_cur, bias));
+        v_eq = _mm256_shuffle_epi8(_mm256_permute2x128_si256(v_eq, v_eq, 0x01),
+                                   rev16);
+        v_gt = _mm256_shuffle_epi8(_mm256_permute2x128_si256(v_gt, v_gt, 0x01),
+                                   rev16);
+        unsigned int eq = (unsigned int)_mm256_movemask_epi8(v_eq);
+        unsigned int gt = (unsigned int)_mm256_movemask_epi8(v_gt);
+        // Carry propagation propagates S-type from right (LSB) to left (MSB).
+        unsigned int sum = eq + ((gt << 1) | prev_s);
+        unsigned int s_mask = ((~sum) & eq) | gt;
+        unsigned int lms_mask = (~s_mask) & ((s_mask << 1) | prev_s);
+        prev_s = s_mask >> 31;
+        fn_block(base + 32, lms_mask);
+      }
+    }
+  } else if constexpr (std::is_same_v<CharT, int>) {
+    if (i >= 7) {
+      const __m256i rev8 = _mm256_setr_epi32(7, 6, 5, 4, 3, 2, 1, 0);
+      for (; i >= 7; i -= 8) {
+        int base = i - 7;
+        __m256i v_cur = _mm256_loadu_si256((const __m256i*)(s + base));
+        __m256i v_next = _mm256_loadu_si256((const __m256i*)(s + base + 1));
+        __m256i v_eq = _mm256_permutevar8x32_epi32(
+            _mm256_cmpeq_epi32(v_cur, v_next), rev8);
+        __m256i v_gt = _mm256_permutevar8x32_epi32(
+            _mm256_cmpgt_epi32(v_next, v_cur), rev8);
+        unsigned int eq = (unsigned int)_mm256_movemask_ps((__m256)v_eq);
+        unsigned int gt = (unsigned int)_mm256_movemask_ps((__m256)v_gt);
+        unsigned int sum = eq + ((gt << 1) | prev_s);
+        unsigned int s_mask = (((~sum) & eq) | gt) & 0xFFU;
+        unsigned int lms_mask = ((~s_mask) & ((s_mask << 1) | prev_s)) & 0xFFU;
+        prev_s = s_mask >> 7;
+        fn_block(base + 8, lms_mask);
+      }
+    }
+  }
+  int ps = (int)prev_s;
+  int next_c = (int)s[i + 1];
+  for (; i >= 0; --i) {
+    int c = (int)s[i];
+    int cur_s = (c < next_c) | ((c == next_c) & ps);
+    int is_lms = (~cur_s) & ps;
+    fn_tail(i + 1, is_lms);
+    ps = cur_s;
+    next_c = c;
+  }
+}
+
+template <typename CharT>
+inline void count_symbols_and_lms(const CharT* s, int n, int upper, int* cnt,
+                                  int& m, int& last_lms) {
+  if constexpr (sizeof(CharT) == 1) {
+    int cnt4[4][256] = {};
+    int i = 0;
+    for (; i + 3 < n; i += 4) {
+      ++cnt4[0][s[i]];
+      ++cnt4[1][s[i + 1]];
+      ++cnt4[2][s[i + 2]];
+      ++cnt4[3][s[i + 3]];
+    }
+    for (; i < n; ++i) ++cnt[s[i]];
+    for (int c = 0; c <= upper; ++c) {
+      cnt[c] += cnt4[0][c] + cnt4[1][c] + cnt4[2][c] + cnt4[3][c];
+    }
+  } else {
+    for (int i = 0; i < n; ++i) ++cnt[s[i]];
+  }
+  m = 0;
+  last_lms = -1;
+  scan_lms_blocks_avx2(
+      s, n,
+      [&](int end_pos, unsigned int lms_mask) {
+        if (lms_mask) {
+          m += std::popcount(lms_mask);
+          last_lms = end_pos - (31 - std::countl_zero(lms_mask));
+        }
+      },
+      [&](int pos, int is_lms) {
+        m += is_lms;
+        last_lms = is_lms ? pos : last_lms;
+      });
+}
+
+template <typename CharT, typename F>
+inline void for_each_lms_pos(const CharT* s, int n, F&& fn) {
+  scan_lms_blocks_avx2(
+      s, n,
+      [&](int end_pos, unsigned int lms_mask) {
+        while (lms_mask) {
+          fn(end_pos - std::countr_zero(lms_mask));
+          lms_mask &= lms_mask - 1;
+        }
+      },
+      [&](int pos, int is_lms) {
+        if (is_lms) fn(pos);
+      });
+}
+
+inline void compact_lms(int* sa, int n) {
+  int k = 0;
+  int i = 0;
+  const __m256i clear_lms = _mm256_set1_epi32(~kLmsBit);
+  for (; i + 8 <= n && k + 8 <= n; i += 8) {
+    __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
+    unsigned int mask =
+        (unsigned int)_mm256_movemask_ps((__m256)_mm256_slli_epi32(v, 1));
+    __m128i bytes = _mm_loadl_epi64((const __m128i*)kCompressTable.idx[mask]);
+    __m256i perm = _mm256_cvtepu8_epi32(bytes);
+    __m256i packed =
+        _mm256_permutevar8x32_epi32(_mm256_and_si256(v, clear_lms), perm);
+    _mm256_storeu_si256((__m256i*)(sa + k), packed);
+    k += std::popcount(mask);
+  }
+  for (; i < n; ++i) {
+    int v = sa[i];
+    sa[k] = v & ~kLmsBit;
+    k += (v >> 30) & 1;
+  }
+}
+
+inline void compact_rec_s(int* sa, int m, int n) {
+  int* rec_s = sa + m;
+  int j = 0;
+  int i = m;
+  for (; i + 8 <= n; i += 8) {
+    __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
+    unsigned int mask = (~(unsigned int)_mm256_movemask_ps((__m256)v)) & 0xFFU;
+    __m128i bytes = _mm_loadl_epi64((const __m128i*)kCompressTable.idx[mask]);
+    __m256i perm = _mm256_cvtepu8_epi32(bytes);
+    __m256i packed = _mm256_permutevar8x32_epi32(v, perm);
+    _mm256_storeu_si256((__m256i*)(rec_s + j), packed);
+    j += std::popcount(mask);
+  }
+  for (; i < n; ++i) {
+    int v = sa[i];
+    rec_s[j] = v;
+    j += (v >= 0);
+  }
+}
+
+template <typename CharT>
+inline bool lms_substr_diff(const CharT* s, int n, int a, int b, int len) {
+  if constexpr (sizeof(CharT) == 1) {
+    if (len <= 16 && a + 16 <= n && b + 16 <= n) {
+      __m128i va = _mm_loadu_si128((const __m128i*)(s + a));
+      __m128i vb = _mm_loadu_si128((const __m128i*)(s + b));
+      unsigned int eq = (unsigned int)_mm_movemask_epi8(_mm_cmpeq_epi8(va, vb));
+      return ((~eq) & ((1U << len) - 1U)) != 0;
+    }
+    if (len > 16) {
+      return std::memcmp(s + a, s + b, (unsigned long)len) != 0;
+    }
+  } else {
+    if (len <= 8 && a + 8 <= n && b + 8 <= n) {
+      __m256i va = _mm256_loadu_si256((const __m256i*)(s + a));
+      __m256i vb = _mm256_loadu_si256((const __m256i*)(s + b));
+      unsigned int eq =
+          (unsigned int)_mm256_movemask_ps((__m256)_mm256_cmpeq_epi32(va, vb));
+      return ((~eq) & ((1U << len) - 1U)) != 0;
+    }
+    if (len > 8) {
+      return std::memcmp(s + a, s + b, (unsigned long)len * sizeof(int)) != 0;
+    }
+  }
+  for (int d = 0; d < len; ++d) {
+    if (s[a + d] != s[b + d]) return true;
+  }
+  return false;
+}
+#else
 inline void set_buckets(const int* cnt, int* bkt, int upper, bool end) {
   int sum = 0;
   if (end) {
@@ -70,11 +322,64 @@ inline void for_each_lms_reverse(const CharT* s, int n, F&& fn) {
     int c = (int)s[i];
     int cur_s = (c < next_c) | ((c == next_c) & prev_s);
     int is_lms = (~cur_s) & prev_s;
-    fn(i + 1, next_c, is_lms);
+    fn(i + 1, is_lms);
     prev_s = cur_s;
     next_c = c;
   }
 }
+
+template <typename CharT>
+inline void count_symbols_and_lms(const CharT* s, int n, int, int* cnt, int& m,
+                                  int& last_lms) {
+  m = 0;
+  last_lms = -1;
+  ++cnt[(int)s[n - 1]];
+  for_each_lms_reverse(s, n, [&](int pos, int is_lms) {
+    ++cnt[(int)s[pos - 1]];
+    m += is_lms;
+    last_lms = is_lms ? pos : last_lms;
+  });
+}
+
+template <typename CharT, typename F>
+inline void for_each_lms_pos(const CharT* s, int n, F&& fn) {
+  for_each_lms_reverse(s, n, [&](int pos, int is_lms) {
+    if (is_lms) fn(pos);
+  });
+}
+
+inline void compact_lms(int* sa, int n) {
+  int k = 0;
+  for (int i = 0; i < n; ++i) {
+    int v = sa[i];
+    sa[k] = v & ~kLmsBit;
+    k += (v >> 30) & 1;
+  }
+}
+
+inline void compact_rec_s(int* sa, int m, int n) {
+  int* rec_s = sa + m;
+  int j = 0;
+  for (int i = m; i < n; ++i) {
+    int v = sa[i];
+    rec_s[j] = v;
+    j += (v >= 0);
+  }
+}
+
+template <typename CharT>
+inline bool lms_substr_diff(const CharT* s, int, int a, int b, int len) {
+  if constexpr (sizeof(CharT) == 1) {
+    if (len > 16) {
+      return std::memcmp(s + a, s + b, (unsigned long)len) != 0;
+    }
+  }
+  for (int d = 0; d < len; ++d) {
+    if (s[a + d] != s[b + d]) return true;
+  }
+  return false;
+}
+#endif
 
 template <typename CharT>
 inline void induce_l(const CharT* s, int n, const int* cnt, int* bkt, int upper,
@@ -160,28 +465,18 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
 
   int m = 0;
   int last_lms = -1;
-  ++cnt[(int)s[n - 1]];
-  for_each_lms_reverse(s, n, [&](int pos, int, int is_lms) {
-    ++cnt[(int)s[pos - 1]];
-    m += is_lms;
-    last_lms = is_lms ? pos : last_lms;
-  });
+  count_symbols_and_lms(s, n, upper, cnt, m, last_lms);
+  assert(0 <= m && m <= n);
 
-  std::fill(sa, sa + n, -1);
+  std::memset(sa, 0xff, (unsigned long)n * sizeof(int));
 
-  int dummy = 0;
   if (m >= 1) {
     set_buckets(cnt, bkt, upper, true);
     if (m == 1) {
       sa[--bkt[(int)s[last_lms]]] = last_lms | kLmsBit;
     } else {
-      for_each_lms_reverse(s, n, [&](int pos, int next_c, int is_lms) {
-        int b = bkt[next_c] - 1;
-        int* bp = is_lms ? &bkt[next_c] : &dummy;
-        *bp = b;
-        int* dst = is_lms ? &sa[b] : &dummy;
-        *dst = pos | kLmsBit;
-      });
+      for_each_lms_pos(
+          s, n, [&](int pos) { sa[--bkt[(int)s[pos]]] = pos | kLmsBit; });
     }
   }
 
@@ -192,23 +487,17 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
   }
   induce_s<true>(s, n, cnt, bkt, upper, sa);
 
-  int k = 0;
-  for (int i = 0; i < n; ++i) {
-    int v = sa[i];
-    sa[k] = v & ~kLmsBit;
-    k += (v >> 30) & 1;
-  }
+  compact_lms(sa, n);
 
   // No two adjacent indices can be LMS, so (p >> 1) uniquely maps every LMS
   // position into sa[m .. n - 1] without an external lms_map array.
-  std::fill(sa + m, sa + n, -1);
+  std::memset(sa + m, 0xff, (unsigned long)(n - m) * sizeof(int));
   {
     int prev_lms = n;
-    for_each_lms_reverse(s, n, [&](int p, int, int is_lms) {
-      int* dst = is_lms ? &sa[m + (p >> 1)] : &dummy;
+    for_each_lms_pos(s, n, [&](int p) {
       // Sentinel-terminated last LMS gets length 1 (non-last LMS have len >= 3).
-      *dst = (prev_lms == n) ? 1 : (prev_lms - p + 1);
-      prev_lms = is_lms ? p : prev_lms;
+      sa[m + (p >> 1)] = (prev_lms == n) ? 1 : (prev_lms - p + 1);
+      prev_lms = p;
     });
   }
 
@@ -220,28 +509,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
     for (int i = 1; i < m; ++i) {
       int p = sa[i];
       int len = sa[m + (p >> 1)];
-      bool diff = (len != prev_len);
-      if (!diff) {
-        if constexpr (sizeof(CharT) == 1) {
-          if (len > 16) {
-            diff = (std::memcmp(s + prev_p, s + p, (unsigned long)len) != 0);
-          } else {
-            for (int d = 0; d < len; ++d) {
-              if (s[prev_p + d] != s[p + d]) {
-                diff = true;
-                break;
-              }
-            }
-          }
-        } else {
-          for (int d = 0; d < len; ++d) {
-            if (s[prev_p + d] != s[p + d]) {
-              diff = true;
-              break;
-            }
-          }
-        }
-      }
+      bool diff = (len != prev_len) || lms_substr_diff(s, n, prev_p, p, len);
       if (diff) {
         ++rec_upper;
         prev_p = p;
@@ -253,24 +521,17 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
 
   if (rec_upper + 1 < m) {
     int* rec_s = sa + m;
-    int j = 0;
-    for (int i = m; i < n; ++i) {
-      if (sa[i] >= 0) rec_s[j++] = sa[i];
-    }
+    compact_rec_s(sa, m, n);
     sa_is_core<int>(rec_s, m, rec_upper, sa, cnt_pool, cnt_offset + upper + 1,
                     bkt_vec);
-    j = m;
-    for_each_lms_reverse(s, n, [&](int p, int, int is_lms) {
-      j -= is_lms;
-      int* dst = is_lms ? &sa[m + j] : &dummy;
-      *dst = p;
-    });
+    int j = m;
+    for_each_lms_pos(s, n, [&](int p) { sa[m + (--j)] = p; });
     for (int i = 0; i < m; ++i) sa[i] = sa[m + sa[i]];
     cnt = cnt_pool.data() + cnt_offset;
     bkt = bkt_vec.data();
   }
 
-  std::fill(sa + m, sa + n, -1);
+  std::memset(sa + m, 0xff, (unsigned long)(n - m) * sizeof(int));
   set_buckets(cnt, bkt, upper, true);
   for (int i = m - 1; i >= 0; --i) {
     int p = sa[i];
