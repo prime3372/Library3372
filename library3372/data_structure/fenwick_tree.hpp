@@ -175,7 +175,7 @@ template <typename T, typename Storage> class ScalarImpl {
 #ifdef __AVX2__
 
 struct Avx2Masks {
-  alignas(32) static constexpr unsigned int kSuffix32[8][8] = {
+  alignas(32) static constexpr unsigned int suffix_32[8][8] = {
       {~0U, ~0U, ~0U, ~0U, ~0U, ~0U, ~0U, ~0U},
       {0U, ~0U, ~0U, ~0U, ~0U, ~0U, ~0U, ~0U},
       {0U, 0U, ~0U, ~0U, ~0U, ~0U, ~0U, ~0U},
@@ -186,7 +186,7 @@ struct Avx2Masks {
       {0U, 0U, 0U, 0U, 0U, 0U, 0U, ~0U},
   };
 
-  alignas(32) static constexpr unsigned long long kSuffix64[8][8] = {
+  alignas(32) static constexpr unsigned long long suffix_64[8][8] = {
       {~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL},
       {0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL},
       {0ULL, 0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL},
@@ -216,31 +216,30 @@ template <typename T, typename Storage> class Avx2Impl {
     init_layout(n_);
     nodes_.resize(total_nodes_);
 
-    int lvl0_cnt = (height_ > 1) ? level_offset_[1] : total_nodes_;
-    int full_blocks = n_ >> kLogB;
+    int full_blocks = n_ >> log_b;
     for (int b = 0; b < full_blocks; ++b) {
-      const int base = b << kLogB;
+      const int base = b << log_b;
       Storage total;
       if constexpr (sizeof(U) == sizeof(Storage) && internal::is_integer_v<U>) {
-        total = prefix_sum_unaligned(&a[base], nodes_[b]);
+        total = prefix_sum_block<false>(&a[base], nodes_[b]);
       } else {
         Node tmp;
-        for (int j = 0; j < kBlockSize; ++j) tmp.v[j] = (Storage)(T)a[base + j];
-        total = prefix_sum_node(tmp, nodes_[b]);
+        for (int j = 0; j < block_size; ++j) tmp.v[j] = (Storage)(T)a[base + j];
+        total = prefix_sum_block<true>(tmp.v, nodes_[b]);
       }
       if (height_ > 1) {
-        nodes_[level_offset_[1] + (b >> kLogB)].v[b & kMask] = total;
+        nodes_[level_offset_[1] + (b >> log_b)].v[b & mask] = total;
       }
     }
-    if (full_blocks < lvl0_cnt) {
-      int rem = n_ - (full_blocks << kLogB);
+    int rem = n_ & mask;
+    if (rem > 0) {
       Node tmp{};
-      int base = full_blocks << kLogB;
+      int base = full_blocks << log_b;
       for (int j = 0; j < rem; ++j) tmp.v[j] = (Storage)(T)a[base + j];
-      Storage total = prefix_sum_node(tmp, nodes_[full_blocks]);
+      Storage total = prefix_sum_block<true>(tmp.v, nodes_[full_blocks]);
       if (height_ > 1) {
-        nodes_[level_offset_[1] + (full_blocks >> kLogB)]
-            .v[full_blocks & kMask] = total;
+        nodes_[level_offset_[1] + (full_blocks >> log_b)]
+            .v[full_blocks & mask] = total;
       }
     }
 
@@ -248,11 +247,10 @@ template <typename T, typename Storage> class Avx2Impl {
       int start = level_offset_[lvl];
       int end = (lvl + 1 < height_) ? level_offset_[lvl + 1] : total_nodes_;
       for (int b = start; b < end; ++b) {
-        Storage total = prefix_sum_node(nodes_[b], nodes_[b]);
+        Storage total = prefix_sum_block<true>(nodes_[b].v, nodes_[b]);
         if (lvl + 1 < height_) {
           int idx = b - start;
-          nodes_[level_offset_[lvl + 1] + (idx >> kLogB)].v[idx & kMask] =
-              total;
+          nodes_[level_offset_[lvl + 1] + (idx >> log_b)].v[idx & mask] = total;
         }
       }
     }
@@ -272,10 +270,10 @@ template <typename T, typename Storage> class Avx2Impl {
     Storage sr = 0;
     Storage sl = 0;
     for (int lvl = 0; l != r; ++lvl) {
-      int jr = r & kMask;
-      int jl = l & kMask;
-      r >>= kLogB;
-      l >>= kLogB;
+      int jr = r & mask;
+      int jl = l & mask;
+      r >>= log_b;
+      l >>= log_b;
       if (jr > 0) sr += nodes_[level_offset_[lvl] + r].v[jr - 1];
       if (jl > 0) sl += nodes_[level_offset_[lvl] + l].v[jl - 1];
     }
@@ -287,18 +285,18 @@ template <typename T, typename Storage> class Avx2Impl {
     Storage s = 0;
     int node_idx = 0;
     long long pos = 0;
-    int shift = (height_ - 1) * kLogB;
-    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= kLogB) {
+    int shift = (height_ - 1) * log_b;
+    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
-      int max_k = (int)std::min<long long>(kBlockSize, (n_ - pos) >> shift);
+      int max_k = (int)std::min<long long>(block_size, (n_ - pos) >> shift);
       int k = 0;
-      if (max_k == kBlockSize) {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+      if (max_k == block_size) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           if (pred((T)(s + node.v[k + step - 1]))) k += step;
         }
-        if (k == kBlockSize) return n_;
+        if (k == block_size) return n_;
       } else {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           if (k + step <= max_k && pred((T)(s + node.v[k + step - 1]))) {
             k += step;
           }
@@ -307,7 +305,7 @@ template <typename T, typename Storage> class Avx2Impl {
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
       if (pos == n_) return n_;
-      node_idx = (node_idx << kLogB) + k;
+      node_idx = (node_idx << log_b) + k;
     }
     return (int)pos;
   }
@@ -319,33 +317,33 @@ template <typename T, typename Storage> class Avx2Impl {
     Storage s = 0;
     int node_idx = 0;
     long long pos = 0;
-    int shift = (height_ - 1) * kLogB;
-    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= kLogB) {
+    int shift = (height_ - 1) * log_b;
+    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
       int min_k = (pos < l)
-                      ? (int)std::min<long long>(kBlockSize, (l - pos) >> shift)
+                      ? (int)std::min<long long>(block_size, (l - pos) >> shift)
                       : 0;
-      int max_k = (int)std::min<long long>(kBlockSize, (n_ - pos) >> shift);
+      int max_k = (int)std::min<long long>(block_size, (n_ - pos) >> shift);
       int k = 0;
-      if (min_k == 0 && max_k == kBlockSize) {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+      if (min_k == 0 && max_k == block_size) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           if (pred((T)(s + node.v[k + step - 1] - base))) k += step;
         }
-        if (k == kBlockSize) return n_;
+        if (k == block_size) return n_;
       } else {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           int cand = k + step;
           if (cand <= min_k ||
               (cand <= max_k && pred((T)(s + node.v[cand - 1] - base)))) {
             k = cand;
           }
         }
-        if (k == kBlockSize) return n_;
+        if (k == block_size) return n_;
       }
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
       if (pos == n_) return n_;
-      node_idx = (node_idx << kLogB) + k;
+      node_idx = (node_idx << log_b) + k;
     }
     return (int)pos;
   }
@@ -357,18 +355,18 @@ template <typename T, typename Storage> class Avx2Impl {
     Storage s = 0;
     int node_idx = 0;
     long long pos = 0;
-    int shift = (height_ - 1) * kLogB;
-    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= kLogB) {
+    int shift = (height_ - 1) * log_b;
+    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
       int max_k =
-          (int)std::min<long long>(kBlockSize - 1, (r - 1 - pos) >> shift);
+          (int)std::min<long long>(block_size - 1, (r - 1 - pos) >> shift);
       int k = 0;
-      if (max_k == kBlockSize - 1) {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+      if (max_k == block_size - 1) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           if (!pred((T)(s_r - (s + node.v[k + step - 1])))) k += step;
         }
       } else {
-        for (int step = kBlockSize >> 1; step > 0; step >>= 1) {
+        for (int step = block_size >> 1; step > 0; step >>= 1) {
           if (k + step <= max_k &&
               !pred((T)(s_r - (s + node.v[k + step - 1])))) {
             k += step;
@@ -377,44 +375,44 @@ template <typename T, typename Storage> class Avx2Impl {
       }
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
-      node_idx = (node_idx << kLogB) + k;
+      node_idx = (node_idx << log_b) + k;
     }
     return (int)pos + 1;
   }
 
  private:
-  static constexpr int kLogB = 3;
-  static constexpr int kBlockSize = 1 << kLogB;
-  static constexpr int kMask = kBlockSize - 1;
+  static constexpr int log_b = 3;
+  static constexpr int block_size = 1 << log_b;
+  static constexpr int mask = block_size - 1;
 
-  struct alignas(sizeof(Storage) * kBlockSize) Node {
-    Storage v[kBlockSize];
+  struct alignas(sizeof(Storage) * block_size) Node {
+    Storage v[block_size];
   };
 
   void init_layout(int n) {
-    int cnt = (n + kBlockSize) >> kLogB;
+    int cnt = (n >> log_b) + 1;
     height_ = 0;
     total_nodes_ = 0;
     while (true) {
       level_offset_[height_++] = total_nodes_;
       total_nodes_ += cnt;
       if (cnt == 1) break;
-      cnt = (cnt + kBlockSize - 1) >> kLogB;
+      cnt = (cnt + block_size - 1) >> log_b;
     }
   }
 
   static void add_suffix(Node& node, int j, Storage x) {
     if constexpr (sizeof(Storage) == 4) {
       __m256i vx = _mm256_set1_epi32((int)x);
-      __m256i m = _mm256_load_si256((const __m256i*)Avx2Masks::kSuffix32[j]);
+      __m256i m = _mm256_load_si256((const __m256i*)Avx2Masks::suffix_32[j]);
       __m256i v = _mm256_load_si256((const __m256i*)node.v);
       v = _mm256_add_epi32(v, _mm256_and_si256(vx, m));
       _mm256_store_si256((__m256i*)node.v, v);
     } else {
       __m256i vx = _mm256_set1_epi64x((long long)x);
-      __m256i m0 = _mm256_load_si256((const __m256i*)Avx2Masks::kSuffix64[j]);
+      __m256i m0 = _mm256_load_si256((const __m256i*)Avx2Masks::suffix_64[j]);
       __m256i m1 =
-          _mm256_load_si256((const __m256i*)(Avx2Masks::kSuffix64[j] + 4));
+          _mm256_load_si256((const __m256i*)(Avx2Masks::suffix_64[j] + 4));
       __m256i v0 = _mm256_load_si256((const __m256i*)node.v);
       __m256i v1 = _mm256_load_si256((const __m256i*)(node.v + 4));
       v0 = _mm256_add_epi64(v0, _mm256_and_si256(vx, m0));
@@ -431,9 +429,11 @@ template <typename T, typename Storage> class Avx2Impl {
     return _mm256_add_epi64(v, lo);
   }
 
-  static Storage prefix_sum_node(const Node& src, Node& dst) {
+  template <bool Aligned, typename Ptr>
+  static Storage prefix_sum_block(const Ptr* src, Node& dst) {
     if constexpr (sizeof(Storage) == 4) {
-      __m256i v = _mm256_load_si256((const __m256i*)src.v);
+      __m256i v = Aligned ? _mm256_load_si256((const __m256i*)src)
+                          : _mm256_loadu_si256((const __m256i*)src);
       v = _mm256_add_epi32(v, _mm256_slli_si256(v, 4));
       v = _mm256_add_epi32(v, _mm256_slli_si256(v, 8));
       __m256i s = _mm256_shuffle_epi32(v, 0xFF);
@@ -442,32 +442,10 @@ template <typename T, typename Storage> class Avx2Impl {
       _mm256_store_si256((__m256i*)dst.v, v);
       return dst.v[7];
     } else {
-      __m256i v0 = _mm256_load_si256((const __m256i*)src.v);
-      __m256i v1 = _mm256_load_si256((const __m256i*)(src.v + 4));
-      v0 = prefix_sum_half64(v0);
-      v1 = prefix_sum_half64(v1);
-      __m256i carry = _mm256_permute4x64_epi64(v0, 0xFF);
-      v1 = _mm256_add_epi64(v1, carry);
-      _mm256_store_si256((__m256i*)dst.v, v0);
-      _mm256_store_si256((__m256i*)(dst.v + 4), v1);
-      return dst.v[7];
-    }
-  }
-
-  template <typename U>
-  static Storage prefix_sum_unaligned(const U* src, Node& dst) {
-    if constexpr (sizeof(Storage) == 4) {
-      __m256i v = _mm256_loadu_si256((const __m256i*)src);
-      v = _mm256_add_epi32(v, _mm256_slli_si256(v, 4));
-      v = _mm256_add_epi32(v, _mm256_slli_si256(v, 8));
-      __m256i s = _mm256_shuffle_epi32(v, 0xFF);
-      __m256i carry = _mm256_permute2x128_si256(s, s, 0x08);
-      v = _mm256_add_epi32(v, carry);
-      _mm256_store_si256((__m256i*)dst.v, v);
-      return dst.v[7];
-    } else {
-      __m256i v0 = _mm256_loadu_si256((const __m256i*)src);
-      __m256i v1 = _mm256_loadu_si256((const __m256i*)(src + 4));
+      __m256i v0 = Aligned ? _mm256_load_si256((const __m256i*)src)
+                           : _mm256_loadu_si256((const __m256i*)src);
+      __m256i v1 = Aligned ? _mm256_load_si256((const __m256i*)(src + 4))
+                           : _mm256_loadu_si256((const __m256i*)(src + 4));
       v0 = prefix_sum_half64(v0);
       v1 = prefix_sum_half64(v1);
       __m256i carry = _mm256_permute4x64_epi64(v0, 0xFF);
@@ -480,23 +458,23 @@ template <typename T, typename Storage> class Avx2Impl {
 
   void add_storage(int p, Storage x) {
     for (int lvl = 0; lvl < height_; ++lvl) {
-      int j = p & kMask;
-      p >>= kLogB;
+      int j = p & mask;
+      p >>= log_b;
       add_suffix(nodes_[level_offset_[lvl] + p], j, x);
     }
   }
 
   Storage get_storage(int p) const {
-    const Node& node = nodes_[p >> kLogB];
-    int j = p & kMask;
+    const Node& node = nodes_[p >> log_b];
+    int j = p & mask;
     return j > 0 ? node.v[j] - node.v[j - 1] : node.v[0];
   }
 
   Storage prefix_sum(int r) const {
     Storage s = 0;
     for (int lvl = 0; r > 0; ++lvl) {
-      int j = r & kMask;
-      r >>= kLogB;
+      int j = r & mask;
+      r >>= log_b;
       if (j > 0) s += nodes_[level_offset_[lvl] + r].v[j - 1];
     }
     return s;
@@ -511,23 +489,14 @@ template <typename T, typename Storage> class Avx2Impl {
 
 #endif  // __AVX2__
 
-template <typename T, typename Storage> constexpr bool use_avx2() {
 #ifdef __AVX2__
-  return internal::is_integer_v<Storage> &&
-         (sizeof(Storage) == 4 || sizeof(Storage) == 8);
+template <typename T, typename Storage>
+using ImplType =
+    std::conditional_t<internal::is_integer_v<Storage> &&
+                           (sizeof(Storage) == 4 || sizeof(Storage) == 8),
+                       Avx2Impl<T, Storage>, ScalarImpl<T, Storage>>;
 #else
-  return false;
-#endif
-}
-
-template <typename T, typename Storage, bool UseAvx2> struct ImplSelector {
-  using type = ScalarImpl<T, Storage>;
-};
-
-#ifdef __AVX2__
-template <typename T, typename Storage> struct ImplSelector<T, Storage, true> {
-  using type = Avx2Impl<T, Storage>;
-};
+template <typename T, typename Storage> using ImplType = ScalarImpl<T, Storage>;
 #endif
 
 }  // namespace internal_fenwick_tree
@@ -601,10 +570,7 @@ class FenwickTree {
 
  private:
   using Storage = typename internal_fenwick_tree::StorageType<T>::type;
-  using Impl = typename internal_fenwick_tree::ImplSelector<
-      T, Storage, internal_fenwick_tree::use_avx2<T, Storage>()>::type;
-
-  Impl impl_;
+  internal_fenwick_tree::ImplType<T, Storage> impl_;
 };
 
 }  // namespace library3372
