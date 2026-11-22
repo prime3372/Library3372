@@ -7,8 +7,8 @@
 ## コンストラクタ
 
 ```cpp
-UnionFind::UnionFind()       // (1)
-UnionFind::UnionFind(int n)  // (2)
+UnionFind::UnionFind();       // (1)
+UnionFind::UnionFind(int n);  // (2)
 ```
 
 - (1): $0$ 頂点 $0$ 辺の無向グラフで初期化します。
@@ -26,7 +26,7 @@ UnionFind::UnionFind(int n)  // (2)
 ## unite
 
 ```cpp
-std::optional<std::pair<int, int>> UnionFind::unite(int x, int y)
+std::optional<std::pair<int, int>> UnionFind::unite(int x, int y);
 ```
 
 頂点 $x$ と頂点 $y$ の間に無向辺を追加します。
@@ -49,7 +49,7 @@ std::optional<std::pair<int, int>> UnionFind::unite(int x, int y)
 ## find
 
 ```cpp
-int UnionFind::find(int x)
+int UnionFind::find(int x);
 ```
 
 頂点 $x$ が属する連結成分の代表元を返します。
@@ -65,7 +65,7 @@ int UnionFind::find(int x)
 ## same
 
 ```cpp
-bool UnionFind::same(int x, int y)
+bool UnionFind::same(int x, int y);
 ```
 
 頂点 $x$ と頂点 $y$ が連結であれば `true` を、そうでなければ `false` を返します。
@@ -82,7 +82,7 @@ bool UnionFind::same(int x, int y)
 ## size
 
 ```cpp
-int UnionFind::size(int x)
+int UnionFind::size(int x);
 ```
 
 頂点 $x$ が属する連結成分の頂点数を返します。
@@ -98,7 +98,7 @@ int UnionFind::size(int x)
 ## count_groups
 
 ```cpp
-int UnionFind::count_groups() const
+int UnionFind::count_groups() const;
 ```
 
 連結成分の個数を返します。
@@ -110,7 +110,7 @@ int UnionFind::count_groups() const
 ## groups
 
 ```cpp
-std::vector<std::vector<int>> UnionFind::groups()
+std::vector<std::vector<int>> UnionFind::groups();
 ```
 
 すべての連結成分について「その連結成分に属する頂点番号の配列」をまとめた配列を返します。それぞれの連結成分内の頂点は昇順に格納されますが、集合の順番は未定義です。

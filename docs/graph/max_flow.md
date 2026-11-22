@@ -38,8 +38,8 @@ struct Edge {
 ## コンストラクタ
 
 ```cpp
-MaxFlow::MaxFlow()       // (1)
-MaxFlow::MaxFlow(int n)  // (2)
+MaxFlow::MaxFlow();       // (1)
+MaxFlow::MaxFlow(int n);  // (2)
 ```
 
 - (1): $0$ 頂点 $0$ 辺の有向グラフで初期化します。
@@ -57,7 +57,7 @@ MaxFlow::MaxFlow(int n)  // (2)
 ## add_edge
 
 ```cpp
-int MaxFlow::add_edge(int from, int to, Cap cap)
+int MaxFlow::add_edge(int from, int to, Cap cap);
 ```
 
 頂点 `from` から頂点 `to` へ容量 `cap`、初期流量 $0$ の有向辺を追加し、その辺の番号を返します。辺の番号は追加順に $0$ から割り当てられます。
@@ -75,7 +75,7 @@ int MaxFlow::add_edge(int from, int to, Cap cap)
 ## get_edge
 
 ```cpp
-Edge MaxFlow::get_edge(int i) const
+Edge MaxFlow::get_edge(int i) const;
 ```
 
 番号 $i$ の辺の現在の状態を返します。
@@ -91,7 +91,7 @@ Edge MaxFlow::get_edge(int i) const
 ## edges
 
 ```cpp
-std::vector<Edge> MaxFlow::edges() const
+std::vector<Edge> MaxFlow::edges() const;
 ```
 
 追加されたすべての辺の現在の状態を番号順に並べた配列を返します。
@@ -103,8 +103,8 @@ std::vector<Edge> MaxFlow::edges() const
 ## flow
 
 ```cpp
-Cap MaxFlow::flow(int s, int t)                  // (1)
-Cap MaxFlow::flow(int s, int t, Cap flow_limit)  // (2)
+Cap MaxFlow::flow(int s, int t);                  // (1)
+Cap MaxFlow::flow(int s, int t, Cap flow_limit);  // (2)
 ```
 
 現在の残余グラフにおいて頂点 $s$ から頂点 $t$ へフローを流し、この呼び出しによって新たに流せた流量を返します。
@@ -131,7 +131,7 @@ Cap MaxFlow::flow(int s, int t, Cap flow_limit)  // (2)
 ## min_cut
 
 ```cpp
-std::vector<bool> MaxFlow::min_cut(int s) const
+std::vector<bool> MaxFlow::min_cut(int s) const;
 ```
 
 現在の残余グラフ上で頂点 $s$ から到達可能な頂点を `true`、そうでない頂点を `false` とした長さ $n$ の真偽値配列を返します。`flow(s, t)` を呼び出した直後に呼ぶと、最小 $s$-$t$ カットが得られます。

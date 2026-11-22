@@ -5,8 +5,8 @@
 ## コンストラクタ
 
 ```cpp
-SccGraph::SccGraph()       // (1)
-SccGraph::SccGraph(int n)  // (2)
+SccGraph::SccGraph();       // (1)
+SccGraph::SccGraph(int n);  // (2)
 ```
 
 - (1): $0$ 頂点 $0$ 辺の有向グラフで初期化します。
@@ -24,7 +24,7 @@ SccGraph::SccGraph(int n)  // (2)
 ## add_edge
 
 ```cpp
-void SccGraph::add_edge(int from, int to)
+void SccGraph::add_edge(int from, int to);
 ```
 
 頂点 `from` から頂点 `to` への有向辺を追加します。
@@ -41,7 +41,7 @@ void SccGraph::add_edge(int from, int to)
 ## build
 
 ```cpp
-void SccGraph::build()
+void SccGraph::build();
 ```
 
 強連結成分分解を行い、`count_groups()`、`ids()`、`groups()` で取得できる結果をすべて構築します。
@@ -53,7 +53,7 @@ void SccGraph::build()
 ## build_ids
 
 ```cpp
-void SccGraph::build_ids()
+void SccGraph::build_ids();
 ```
 
 強連結成分分解を行い、`count_groups()` および `ids()` で取得できる結果のみを構築します。`groups()` の結果は構築されません。
@@ -65,7 +65,7 @@ void SccGraph::build_ids()
 ## count_groups
 
 ```cpp
-int SccGraph::count_groups() const
+int SccGraph::count_groups() const;
 ```
 
 強連結成分の個数を返します。
@@ -82,7 +82,7 @@ int SccGraph::count_groups() const
 ## ids
 
 ```cpp
-const std::vector<int>& SccGraph::ids() const
+const std::vector<int>& SccGraph::ids() const;
 ```
 
 各頂点が属する強連結成分の番号を格納した配列 $\mathrm{ids}$ を返します。これは縮約 DAG におけるトポロジカルソート順になっています。すなわち以下が成り立ちます。
@@ -102,7 +102,7 @@ const std::vector<int>& SccGraph::ids() const
 ## groups
 
 ```cpp
-const std::vector<std::vector<int>>& SccGraph::groups() const
+const std::vector<std::vector<int>>& SccGraph::groups() const;
 ```
 
 すべての強連結成分について「その成分に属する頂点番号の配列」をまとめた配列を返します。配列の $k$ 番目の要素には `ids()` で番号 $k$ が割り当てられた頂点が昇順に格納されます。

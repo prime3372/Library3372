@@ -18,10 +18,10 @@ class StaticModInt;
 ## コンストラクタ
 
 ```cpp
-StaticModInt::StaticModInt()  // (1)
+StaticModInt::StaticModInt();  // (1)
 
 template <typename T>
-StaticModInt::StaticModInt(T v)  // (2)
+StaticModInt::StaticModInt(T v);  // (2)
 ```
 
 - (1): 値 $0$ で初期化します。
@@ -38,7 +38,7 @@ StaticModInt::StaticModInt(T v)  // (2)
 ## mod
 
 ```cpp
-static int StaticModInt::mod()
+static int StaticModInt::mod();
 ```
 
 法 $m$ を返します。
@@ -51,7 +51,7 @@ static int StaticModInt::mod()
 
 ```cpp
 template <typename T>
-static StaticModInt StaticModInt::raw(T v)
+static StaticModInt StaticModInt::raw(T v);
 ```
 
 剰余を取らずに値 $v$ で初期化した `StaticModInt` を返します。
@@ -68,7 +68,7 @@ static StaticModInt StaticModInt::raw(T v)
 ## val
 
 ```cpp
-int StaticModInt::val() const
+int StaticModInt::val() const;
 ```
 
 保持している値を $0$ 以上 $m$ 未満の整数として返します。
@@ -80,7 +80,7 @@ int StaticModInt::val() const
 ## pow
 
 ```cpp
-StaticModInt StaticModInt::pow(long long n) const
+StaticModInt StaticModInt::pow(long long n) const;
 ```
 
 自身の $n$ 乗を返します。
@@ -96,7 +96,7 @@ StaticModInt StaticModInt::pow(long long n) const
 ## inv
 
 ```cpp
-StaticModInt StaticModInt::inv() const
+StaticModInt StaticModInt::inv() const;
 ```
 
 $m$ を法とする乗法逆元を返します。
@@ -112,8 +112,8 @@ $m$ を法とする乗法逆元を返します。
 ## operator++
 
 ```cpp
-StaticModInt& StaticModInt::operator++()    // (1)
-StaticModInt StaticModInt::operator++(int)  // (2)
+StaticModInt& StaticModInt::operator++();    // (1)
+StaticModInt StaticModInt::operator++(int);  // (2)
 ```
 
 値に $1$ を加算します。
@@ -128,8 +128,8 @@ StaticModInt StaticModInt::operator++(int)  // (2)
 ## operator--
 
 ```cpp
-StaticModInt& StaticModInt::operator--()    // (1)
-StaticModInt StaticModInt::operator--(int)  // (2)
+StaticModInt& StaticModInt::operator--();    // (1)
+StaticModInt StaticModInt::operator--(int);  // (2)
 ```
 
 値から $1$ を減算します。
@@ -144,10 +144,10 @@ StaticModInt StaticModInt::operator--(int)  // (2)
 ## operator+=
 
 ```cpp
-StaticModInt& StaticModInt::operator+=(StaticModInt rhs)  // (1)
+StaticModInt& StaticModInt::operator+=(StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt& StaticModInt::operator+=(T rhs)  // (2)
+StaticModInt& StaticModInt::operator+=(T rhs);  // (2)
 ```
 
 `rhs` を加算します。
@@ -163,10 +163,10 @@ StaticModInt& StaticModInt::operator+=(T rhs)  // (2)
 ## operator-=
 
 ```cpp
-StaticModInt& StaticModInt::operator-=(StaticModInt rhs)  // (1)
+StaticModInt& StaticModInt::operator-=(StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt& StaticModInt::operator-=(T rhs)  // (2)
+StaticModInt& StaticModInt::operator-=(T rhs);  // (2)
 ```
 
 `rhs` を減算します。
@@ -182,10 +182,10 @@ StaticModInt& StaticModInt::operator-=(T rhs)  // (2)
 ## operator\*=
 
 ```cpp
-StaticModInt& StaticModInt::operator*=(StaticModInt rhs)  // (1)
+StaticModInt& StaticModInt::operator*=(StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt& StaticModInt::operator*=(T rhs)  // (2)
+StaticModInt& StaticModInt::operator*=(T rhs);  // (2)
 ```
 
 `rhs` を乗算します。
@@ -201,10 +201,10 @@ StaticModInt& StaticModInt::operator*=(T rhs)  // (2)
 ## operator/=
 
 ```cpp
-StaticModInt& StaticModInt::operator/=(StaticModInt rhs)  // (1)
+StaticModInt& StaticModInt::operator/=(StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt& StaticModInt::operator/=(T rhs)  // (2)
+StaticModInt& StaticModInt::operator/=(T rhs);  // (2)
 ```
 
 `rhs` で除算します。
@@ -222,15 +222,15 @@ StaticModInt& StaticModInt::operator/=(T rhs)  // (2)
 ## operator+
 
 ```cpp
-StaticModInt StaticModInt::operator+() const  // (1)
+StaticModInt StaticModInt::operator+() const;  // (1)
 
-StaticModInt operator+(StaticModInt lhs, StaticModInt rhs)  // (2)
-
-template <typename T>
-StaticModInt operator+(StaticModInt lhs, T rhs)  // (3)
+StaticModInt operator+(StaticModInt lhs, StaticModInt rhs);  // (2)
 
 template <typename T>
-StaticModInt operator+(T lhs, StaticModInt rhs)  // (4)
+StaticModInt operator+(StaticModInt lhs, T rhs);  // (3)
+
+template <typename T>
+StaticModInt operator+(T lhs, StaticModInt rhs);  // (4)
 ```
 
 - (1): 自身の値をそのまま返します。
@@ -247,15 +247,15 @@ StaticModInt operator+(T lhs, StaticModInt rhs)  // (4)
 ## operator-
 
 ```cpp
-StaticModInt StaticModInt::operator-() const  // (1)
+StaticModInt StaticModInt::operator-() const;  // (1)
 
-StaticModInt operator-(StaticModInt lhs, StaticModInt rhs)  // (2)
-
-template <typename T>
-StaticModInt operator-(StaticModInt lhs, T rhs)  // (3)
+StaticModInt operator-(StaticModInt lhs, StaticModInt rhs);  // (2)
 
 template <typename T>
-StaticModInt operator-(T lhs, StaticModInt rhs)  // (4)
+StaticModInt operator-(StaticModInt lhs, T rhs);  // (3)
+
+template <typename T>
+StaticModInt operator-(T lhs, StaticModInt rhs);  // (4)
 ```
 
 - (1): 加法逆元を返します。
@@ -272,13 +272,13 @@ StaticModInt operator-(T lhs, StaticModInt rhs)  // (4)
 ## operator\*
 
 ```cpp
-StaticModInt operator*(StaticModInt lhs, StaticModInt rhs)  // (1)
+StaticModInt operator*(StaticModInt lhs, StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt operator*(StaticModInt lhs, T rhs)  // (2)
+StaticModInt operator*(StaticModInt lhs, T rhs);  // (2)
 
 template <typename T>
-StaticModInt operator*(T lhs, StaticModInt rhs)  // (3)
+StaticModInt operator*(T lhs, StaticModInt rhs);  // (3)
 ```
 
 `lhs` と `rhs` の積を返します。
@@ -294,13 +294,13 @@ StaticModInt operator*(T lhs, StaticModInt rhs)  // (3)
 ## operator/
 
 ```cpp
-StaticModInt operator/(StaticModInt lhs, StaticModInt rhs)  // (1)
+StaticModInt operator/(StaticModInt lhs, StaticModInt rhs);  // (1)
 
 template <typename T>
-StaticModInt operator/(StaticModInt lhs, T rhs)  // (2)
+StaticModInt operator/(StaticModInt lhs, T rhs);  // (2)
 
 template <typename T>
-StaticModInt operator/(T lhs, StaticModInt rhs)  // (3)
+StaticModInt operator/(T lhs, StaticModInt rhs);  // (3)
 ```
 
 `lhs` を `rhs` で割った商を返します。
@@ -318,13 +318,13 @@ StaticModInt operator/(T lhs, StaticModInt rhs)  // (3)
 ## operator==
 
 ```cpp
-bool operator==(StaticModInt lhs, StaticModInt rhs)  // (1)
+bool operator==(StaticModInt lhs, StaticModInt rhs);  // (1)
 
 template <typename T>
-bool operator==(StaticModInt lhs, T rhs)  // (2)
+bool operator==(StaticModInt lhs, T rhs);  // (2)
 
 template <typename T>
-bool operator==(T lhs, StaticModInt rhs)  // (3)
+bool operator==(T lhs, StaticModInt rhs);  // (3)
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同であれば `true` を、そうでなければ `false` を返します。
@@ -340,13 +340,13 @@ bool operator==(T lhs, StaticModInt rhs)  // (3)
 ## operator!=
 
 ```cpp
-bool operator!=(StaticModInt lhs, StaticModInt rhs)  // (1)
+bool operator!=(StaticModInt lhs, StaticModInt rhs);  // (1)
 
 template <typename T>
-bool operator!=(StaticModInt lhs, T rhs)  // (2)
+bool operator!=(StaticModInt lhs, T rhs);  // (2)
 
 template <typename T>
-bool operator!=(T lhs, StaticModInt rhs)  // (3)
+bool operator!=(T lhs, StaticModInt rhs);  // (3)
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同でなければ `true` を、そうでなければ `false` を返します。
@@ -362,7 +362,7 @@ bool operator!=(T lhs, StaticModInt rhs)  // (3)
 ## operator<<
 
 ```cpp
-std::ostream& operator<<(std::ostream& os, StaticModInt x)
+std::ostream& operator<<(std::ostream& os, StaticModInt x);
 ```
 
 `x.val()` を出力ストリーム `os` へ書き込みます。
@@ -374,7 +374,7 @@ std::ostream& operator<<(std::ostream& os, StaticModInt x)
 ## operator>>
 
 ```cpp
-std::istream& operator>>(std::istream& is, StaticModInt& x)
+std::istream& operator>>(std::istream& is, StaticModInt& x);
 ```
 
 入力ストリーム `is` から空白区切りで文字列を 1 つ読み込み、10 進表記の整数として解釈した値を法 $m$ で割った余りで `x` を更新します。

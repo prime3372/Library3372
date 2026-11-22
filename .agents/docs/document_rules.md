@@ -70,12 +70,12 @@ struct Edge {
 ## コンストラクタ
 
 ```cpp
-MyClass::MyClass()  // (1)
+MyClass::MyClass();  // (1)
 
-MyClass::MyClass(int n)  // (2)
+MyClass::MyClass(int n);  // (2)
 
 template <typename U>
-MyClass::MyClass(const std::vector<U>& v)  // (3)
+MyClass::MyClass(const std::vector<U>& v);  // (3)
 ```
 
 ここにコンストラクタの説明を書く
@@ -101,7 +101,7 @@ MyClass::MyClass(const std::vector<U>& v)  // (3)
 ## get
 
 ```cpp
-T MyClass::get(int p) const
+T MyClass::get(int p) const;
 ```
 
 ここに関数の説明を書く
@@ -121,14 +121,14 @@ T MyClass::get(int p) const
 
 - コードブロック部分は、静的メンバ関数、非メンバ関数、関数テンプレートの場合はそれぞれ以下のようにしてください。
   ```cpp
-  static void MyClass::static_member()
+  static void MyClass::static_member();
   ```
   ```cpp
-  std::pair<long long, long long> not_member(long long a, long long b)
+  std::pair<long long, long long> not_member(long long a, long long b);
   ```
   ```cpp
   template <typename T>
-  void template_function(const std::vector<T>& v)
+  void template_function(const std::vector<T>& v);
   ```
 - 関数にオーバーロードがある場合は、`## コンストラクタ` と同様に各シグネチャの末尾へ `// (1)`、`// (2)` のように番号を付けてください。
 - `operator<<` や `operator[]` などの演算子を提供する場合も、通常の関数と同様に `## operator[]` のような見出しで記載してください。
