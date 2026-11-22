@@ -129,7 +129,7 @@ void test_threshold_and_exhaustive_small() {
     }
   }
 
-  // Lengths around kThresholdNaive (32) and AVX2 block boundaries (32, 64, 96).
+  // Lengths around threshold_naive (32) and AVX2 block boundaries (32, 64, 96).
   std::mt19937_64 rng(0x123456789abcdef0ULL);
   for (int n : {30, 31, 32, 33, 34, 35, 63, 64, 65, 66, 95, 96, 97}) {
     for (int trial = 0; trial < 12; ++trial) {

@@ -28,9 +28,9 @@
 namespace library3372 {
 namespace internal_suffix_array {
 
-inline constexpr int kThresholdNaive = 32;
-inline constexpr int kTagBit = (int)0x80000000U;
-inline constexpr int kLmsBit = 0x40000000;
+inline constexpr int threshold_naive = 32;
+inline constexpr int tag_bit = (int)0x80000000U;
+inline constexpr int lms_bit = 0x40000000;
 
 template <typename Seq, typename Compare = std::less<>>
 inline void sa_naive(const Seq& s, int n, int* sa,
@@ -68,7 +68,7 @@ struct CompressTable {
   }
 };
 
-inline constexpr CompressTable kCompressTable{};
+inline constexpr CompressTable compress_table{};
 
 inline void set_buckets(const int* cnt, int* bkt, int upper, bool end) {
   if (upper < 64) {
@@ -234,12 +234,12 @@ inline void for_each_lms_pos(const CharT* s, int n, F&& fn) {
 inline void compact_lms(int* sa, int n) {
   int k = 0;
   int i = 0;
-  const __m256i clear_lms = _mm256_set1_epi32(~kLmsBit);
+  const __m256i clear_lms = _mm256_set1_epi32(~lms_bit);
   for (; i + 8 <= n && k + 8 <= n; i += 8) {
     __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
     unsigned int mask =
         (unsigned int)_mm256_movemask_ps((__m256)_mm256_slli_epi32(v, 1));
-    __m128i bytes = _mm_loadl_epi64((const __m128i*)kCompressTable.idx[mask]);
+    __m128i bytes = _mm_loadl_epi64((const __m128i*)compress_table.idx[mask]);
     __m256i perm = _mm256_cvtepu8_epi32(bytes);
     __m256i packed =
         _mm256_permutevar8x32_epi32(_mm256_and_si256(v, clear_lms), perm);
@@ -248,7 +248,7 @@ inline void compact_lms(int* sa, int n) {
   }
   for (; i < n; ++i) {
     int v = sa[i];
-    sa[k] = v & ~kLmsBit;
+    sa[k] = v & ~lms_bit;
     k += (v >> 30) & 1;
   }
 }
@@ -260,7 +260,7 @@ inline void compact_rec_s(int* sa, int m, int n) {
   for (; i + 8 <= n; i += 8) {
     __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
     unsigned int mask = (~(unsigned int)_mm256_movemask_ps((__m256)v)) & 0xFFU;
-    __m128i bytes = _mm_loadl_epi64((const __m128i*)kCompressTable.idx[mask]);
+    __m128i bytes = _mm_loadl_epi64((const __m128i*)compress_table.idx[mask]);
     __m256i perm = _mm256_cvtepu8_epi32(bytes);
     __m256i packed = _mm256_permutevar8x32_epi32(v, perm);
     _mm256_storeu_si256((__m256i*)(rec_s + j), packed);
@@ -356,7 +356,7 @@ inline void compact_lms(int* sa, int n) {
   int k = 0;
   for (int i = 0; i < n; ++i) {
     int v = sa[i];
-    sa[k] = v & ~kLmsBit;
+    sa[k] = v & ~lms_bit;
     k += (v >> 30) & 1;
   }
 }
@@ -390,43 +390,43 @@ inline void induce_l(const CharT* s, int n, const int* cnt, int* bkt, int upper,
                      int* sa) {
   set_buckets(cnt, bkt, upper, false);
   int c_last = (int)s[n - 1];
-  sa[bkt[c_last]++] = ((int)s[n - 2] < c_last) ? ((n - 1) | kTagBit) : (n - 1);
+  sa[bkt[c_last]++] = ((int)s[n - 2] < c_last) ? ((n - 1) | tag_bit) : (n - 1);
   int dummy = 0;
   for (int i = 0; i < n; ++i) {
     int v = sa[i];
     if (v > 0) {
-      // Initial LMS entries carry kLmsBit so they can be cleared without a
+      // Initial LMS entries carry lms_bit so they can be cleared without a
       // separate L/S array; L-type predecessors are tagged if u-1 is S-type.
       int is_lms = v >> 30;
       int* clr = is_lms ? &sa[i] : &dummy;
       *clr = -1;
-      v &= ~kLmsBit;
+      v &= ~lms_bit;
       int u = v - 1;
       int cu = (int)s[u];
-      sa[bkt[cu]++] = (u > 0 && (int)s[u - 1] < cu) ? (u | kTagBit) : u;
+      sa[bkt[cu]++] = (u > 0 && (int)s[u - 1] < cu) ? (u | tag_bit) : u;
     }
   }
 }
 
-template <bool MarkLms, typename CharT>
+template <bool mark_lms, typename CharT>
 inline void induce_s(const CharT* s, int n, const int* cnt, int* bkt, int upper,
                      int* sa) {
   set_buckets(cnt, bkt, upper, true);
   for (int i = n - 1; i >= 0; --i) {
     int v = sa[i];
     if (v < -1) {
-      v &= ~kTagBit;
+      v &= ~tag_bit;
       sa[i] = v;
       int u = v - 1;
       int cu = (int)s[u];
-      if constexpr (MarkLms) {
+      if constexpr (mark_lms) {
         if (u > 0) {
-          sa[--bkt[cu]] = ((int)s[u - 1] <= cu) ? (u | kTagBit) : (u | kLmsBit);
+          sa[--bkt[cu]] = ((int)s[u - 1] <= cu) ? (u | tag_bit) : (u | lms_bit);
         } else {
           sa[--bkt[cu]] = 0;
         }
       } else {
-        sa[--bkt[cu]] = (u > 0 && (int)s[u - 1] <= cu) ? (u | kTagBit) : u;
+        sa[--bkt[cu]] = (u > 0 && (int)s[u - 1] <= cu) ? (u | tag_bit) : u;
       }
     }
   }
@@ -453,7 +453,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
     }
     return;
   }
-  if (n <= kThresholdNaive) {
+  if (n <= threshold_naive) {
     sa_naive(s, n, sa);
     return;
   }
@@ -477,10 +477,10 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
   if (m >= 1) {
     set_buckets(cnt, bkt, upper, true);
     if (m == 1) {
-      sa[--bkt[(int)s[last_lms]]] = last_lms | kLmsBit;
+      sa[--bkt[(int)s[last_lms]]] = last_lms | lms_bit;
     } else {
       for_each_lms_pos(
-          s, n, [&](int pos) { sa[--bkt[(int)s[pos]]] = pos | kLmsBit; });
+          s, n, [&](int pos) { sa[--bkt[(int)s[pos]]] = pos | lms_bit; });
     }
   }
 
@@ -540,7 +540,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
   for (int i = m - 1; i >= 0; --i) {
     int p = sa[i];
     sa[i] = -1;
-    sa[--bkt[(int)s[p]]] = p | kLmsBit;
+    sa[--bkt[(int)s[p]]] = p | lms_bit;
   }
 
   induce_l(s, n, cnt, bkt, upper, sa);
@@ -560,11 +560,11 @@ template <typename U> inline int bit_width_u(U x) {
 template <typename T, typename U>
 std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
   int n = (int)s.size();
-  constexpr int kBits = 10;
-  constexpr int kRadix = 1 << kBits;
-  constexpr unsigned int kMask = kRadix - 1;
+  constexpr int bits = 10;
+  constexpr int radix = 1 << bits;
+  constexpr unsigned int mask = radix - 1;
   int total_bits = bit_width_u(range);
-  int passes = (total_bits + kBits - 1) / kBits;
+  int passes = (total_bits + bits - 1) / bits;
 
   struct Item {
     U key;
@@ -572,19 +572,19 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
   };
   std::vector<Item> buf_a(n);
   std::vector<Item> buf_b(n);
-  std::vector<int> counts(passes * kRadix, 0);
+  std::vector<int> counts(passes * radix, 0);
 
   for (int i = 0; i < n; ++i) {
     U k = (U)s[i] - (U)min_v;
     buf_a[i] = {k, i};
     for (int p = 0; p < passes; ++p) {
-      ++counts[p * kRadix + (int)((unsigned int)(k >> (p * kBits)) & kMask)];
+      ++counts[p * radix + (int)((unsigned int)(k >> (p * bits)) & mask)];
     }
   }
   for (int p = 0; p < passes; ++p) {
-    int* c = counts.data() + p * kRadix;
+    int* c = counts.data() + p * radix;
     int sum = 0;
-    for (int d = 0; d < kRadix; ++d) {
+    for (int d = 0; d < radix; ++d) {
       int v = c[d];
       c[d] = sum;
       sum += v;
@@ -594,10 +594,10 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
   Item* src = buf_a.data();
   Item* dst = buf_b.data();
   for (int p = 0; p < passes; ++p) {
-    int* c = counts.data() + p * kRadix;
-    int shift = p * kBits;
+    int* c = counts.data() + p * radix;
+    int shift = p * bits;
     for (int i = 0; i < n; ++i) {
-      unsigned int d = (unsigned int)(src[i].key >> shift) & kMask;
+      unsigned int d = (unsigned int)(src[i].key >> shift) & mask;
       dst[c[d]++] = src[i];
     }
     std::swap(src, dst);
@@ -677,7 +677,7 @@ inline std::vector<int> suffix_array(const std::vector<int>& s, int upper) {
   assert(n < (1 << 30));
   if (n == 0) return {};
   std::vector<int> sa(n);
-  if (n <= internal_suffix_array::kThresholdNaive) {
+  if (n <= internal_suffix_array::threshold_naive) {
     internal_suffix_array::sa_naive(s.data(), n, sa.data());
     return sa;
   }
@@ -706,7 +706,7 @@ inline std::vector<int> suffix_array(std::string_view s) {
   if (n == 0) return {};
   std::vector<int> sa(n);
   const unsigned char* p = (const unsigned char*)s.data();
-  if (n <= internal_suffix_array::kThresholdNaive) {
+  if (n <= internal_suffix_array::threshold_naive) {
     internal_suffix_array::sa_naive(p, n, sa.data());
     return sa;
   }
@@ -728,16 +728,16 @@ std::vector<int> suffix_array(const std::vector<T>& s,
   assert(n < (1 << 30));
   if (n == 0) return {};
   if (n == 1) return {0};
-  constexpr bool kIsDefaultLess =
+  constexpr bool is_default_less =
       std::is_same_v<std::decay_t<Compare>, std::less<>> ||
       std::is_same_v<std::decay_t<Compare>, std::less<T>>;
   if constexpr (std::is_same_v<T, bool>) {
-    if (n <= internal_suffix_array::kThresholdNaive) {
+    if (n <= internal_suffix_array::threshold_naive) {
       std::vector<int> sa(n);
       internal_suffix_array::sa_naive(s, n, sa.data(), compare);
       return sa;
     }
-    if constexpr (kIsDefaultLess) {
+    if constexpr (is_default_less) {
       std::vector<unsigned char> s2(n);
       for (int i = 0; i < n; ++i) s2[i] = (unsigned char)s[i];
       std::vector<int> sa(n);
@@ -752,12 +752,12 @@ std::vector<int> suffix_array(const std::vector<T>& s,
       return internal_suffix_array::suffix_array_compress_sort(s, compare);
     }
   } else {
-    if (n <= internal_suffix_array::kThresholdNaive) {
+    if (n <= internal_suffix_array::threshold_naive) {
       std::vector<int> sa(n);
       internal_suffix_array::sa_naive(s.data(), n, sa.data(), compare);
       return sa;
     }
-    if constexpr (kIsDefaultLess && internal::is_integer_v<T>) {
+    if constexpr (is_default_less && internal::is_integer_v<T>) {
       if constexpr (sizeof(T) == 1) {
         std::vector<int> sa(n);
         std::vector<int> cnt_pool;
