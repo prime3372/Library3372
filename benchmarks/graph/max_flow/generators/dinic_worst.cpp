@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
   int p = std::atoi(argv[3]);
   assert(k >= 2 && chain_len >= 2 && p >= 1);
 
-  constexpr long long kInf = 1000000000LL;
+  constexpr long long inf = 1000000000LL;
   int n = 2 * k + chain_len + 2;
   int s = 0;
   int t = n - 1;
@@ -31,19 +31,19 @@ int main(int argc, char* argv[]) {
     std::cout << s << ' ' << (x_base + r) << ' ' << p << '\n';
   }
   for (int r = 1; r < k; ++r) {
-    std::cout << (x_base + r) << ' ' << (x_base + r - 1) << ' ' << kInf << '\n';
+    std::cout << (x_base + r) << ' ' << (x_base + r - 1) << ' ' << inf << '\n';
   }
 
   // Long shared chain walked by O(p) unit augmentations per phase.
-  std::cout << x_base << ' ' << c_base << ' ' << kInf << '\n';
+  std::cout << x_base << ' ' << c_base << ' ' << inf << '\n';
   for (int i = 0; i + 1 < chain_len; ++i) {
-    std::cout << (c_base + i) << ' ' << (c_base + i + 1) << ' ' << kInf << '\n';
+    std::cout << (c_base + i) << ' ' << (c_base + i + 1) << ' ' << inf << '\n';
   }
-  std::cout << (c_base + chain_len - 1) << ' ' << y_base << ' ' << kInf << '\n';
+  std::cout << (c_base + chain_len - 1) << ' ' << y_base << ' ' << inf << '\n';
 
   // Right ladder with p unit-capacity parallel edges per phase.
   for (int r = 0; r + 1 < k; ++r) {
-    std::cout << (y_base + r) << ' ' << (y_base + r + 1) << ' ' << kInf << '\n';
+    std::cout << (y_base + r) << ' ' << (y_base + r + 1) << ' ' << inf << '\n';
   }
   for (int r = 0; r < k; ++r) {
     for (int j = 0; j < p; ++j) {
