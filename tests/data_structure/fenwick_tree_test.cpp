@@ -95,7 +95,6 @@ void assert_all_match(const FenwickTree<T>& fw,
                       const NaiveFenwickTree<T>& naive) {
   int n = naive.size();
   assert(fw.size() == n);
-  for (int i = 0; i <= n; ++i) assert(fw.sum(i) == naive.sum(i));
   for (int l = 0; l <= n; ++l) {
     for (int r = l; r <= n; ++r) {
       assert(fw.sum(l, r) == naive.sum(l, r));
@@ -106,17 +105,14 @@ void assert_all_match(const FenwickTree<T>& fw,
 void test_empty_and_single() {
   FenwickTree<long long> fw_default;
   assert(fw_default.size() == 0);
-  assert(fw_default.sum(0) == 0);
   assert(fw_default.sum(0, 0) == 0);
-  assert(fw_default.max_right(0) == 0);
   assert(fw_default.max_right(0, 0) == 0);
   assert(fw_default.min_left(0, 0) == 0);
 
   FenwickTree<long long> fw0(0);
   assert(fw0.size() == 0);
-  assert(fw0.sum(0) == 0);
   assert(fw0.sum(0, 0) == 0);
-  assert(fw0.max_right(0) == 0);
+  assert(fw0.max_right(0, 0) == 0);
   assert(fw0.min_left(0, 0) == 0);
 
   std::vector<long long> empty_vec;
@@ -126,18 +122,18 @@ void test_empty_and_single() {
 
   FenwickTree<long long> fw1(1);
   assert(fw1.size() == 1);
-  assert(fw1.sum(0) == 0);
-  assert(fw1.sum(1) == 0);
+  assert(fw1.sum(0, 0) == 0);
+  assert(fw1.sum(0, 1) == 0);
   fw1.add(0, 5);
   assert(fw1.sum(0, 1) == 5);
-  assert(fw1.max_right(0) == 0);
-  assert(fw1.max_right(4) == 0);
-  assert(fw1.max_right(5) == 1);
+  assert(fw1.max_right(0, 0) == 0);
+  assert(fw1.max_right(0, 4) == 0);
+  assert(fw1.max_right(0, 5) == 1);
   assert(fw1.min_left(1, 0) == 1);
   assert(fw1.min_left(1, 4) == 1);
   assert(fw1.min_left(1, 5) == 0);
   fw1.set(0, -3);
-  assert(fw1.sum(1) == -3);
+  assert(fw1.sum(0, 1) == -3);
 }
 
 void test_constructors_and_ctad() {
@@ -145,7 +141,7 @@ void test_constructors_and_ctad() {
   FenwickTree fw_ctad(vi);
   static_assert(std::is_same_v<decltype(fw_ctad), FenwickTree<int>>);
   assert(fw_ctad.size() == 5);
-  assert(fw_ctad.sum(5) == 15);
+  assert(fw_ctad.sum(0, 5) == 15);
 
   FenwickTree<long long> fw_init({10, 20, 30, 40});
   assert(fw_init.size() == 4);
@@ -158,17 +154,17 @@ void test_constructors_and_ctad() {
   assert(fw_mint.size() == 3);
   assert(fw_mint.sum(0, 1) == Mint(-1));
   assert(fw_mint.sum(1, 2) == Mint(7));
-  assert(fw_mint.sum(3) == Mint(-1) + Mint(7) + Mint(1000000000000LL));
+  assert(fw_mint.sum(0, 3) == Mint(-1) + Mint(7) + Mint(1000000000000LL));
 }
 
 void test_signed_wrap_safety() {
   std::vector<int> init = {1500000000, 500000000, -2000000000, 2000000000};
   FenwickTree<int> fw(init);
-  assert(fw.sum(0) == 0);
-  assert(fw.sum(1) == 1500000000);
-  assert(fw.sum(2) == 2000000000);
-  assert(fw.sum(3) == 0);
-  assert(fw.sum(4) == 2000000000);
+  assert(fw.sum(0, 0) == 0);
+  assert(fw.sum(0, 1) == 1500000000);
+  assert(fw.sum(0, 2) == 2000000000);
+  assert(fw.sum(0, 3) == 0);
+  assert(fw.sum(0, 4) == 2000000000);
   assert(fw.sum(1, 3) == -1500000000);
   assert(fw.sum(2, 4) == 0);
 
@@ -180,8 +176,54 @@ void test_signed_wrap_safety() {
   fw.set(1, -500000000);
   fw.set(2, 0);
   fw.set(3, 1000000000);
-  assert(fw.sum(4) == -1000000000);
+  assert(fw.sum(0, 4) == -1000000000);
   assert(fw.sum(1, 4) == 500000000);
+
+  // Verify exact mod 2^w wraparound across signed integer widths.
+  {
+    std::vector<signed char> a = {100, 100, -100, -100, 80, 80};
+    FenwickTree<signed char> fw8(a);
+    assert(fw8.sum(0, 2) == (signed char)(unsigned char)200);
+    assert(fw8.sum(0, 4) == 0);
+    assert(fw8.sum(4, 6) == (signed char)(unsigned char)160);
+    fw8.add(0, (signed char)100);
+    assert(fw8.sum(0, 2) == (signed char)(unsigned char)300);
+  }
+  {
+    std::vector<short> a = {30000, 30000, -30000, -30000};
+    FenwickTree<short> fw16(a);
+    assert(fw16.sum(0, 2) == (short)(unsigned short)60000);
+    assert(fw16.sum(0, 4) == 0);
+    fw16.set(3, (short)30000);
+    assert(fw16.sum(0, 4) == (short)(unsigned short)60000);
+  }
+  {
+    std::vector<long long> a = {LLONG_MAX, LLONG_MAX, LLONG_MIN, 1,        2,
+                                3,         4,         5,         LLONG_MAX};
+    FenwickTree<long long> fw64(a);
+    unsigned long long u0 =
+        (unsigned long long)LLONG_MAX + (unsigned long long)LLONG_MAX;
+    assert(fw64.sum(0, 2) == (long long)u0);
+    unsigned long long u1 = u0 + (unsigned long long)LLONG_MIN + 15ULL +
+                            (unsigned long long)LLONG_MAX;
+    assert(fw64.sum(0, 9) == (long long)u1);
+    fw64.add(0, LLONG_MAX);
+    fw64.set(8, LLONG_MIN);
+    unsigned long long u2 =
+        u1 + (unsigned long long)LLONG_MAX +
+        ((unsigned long long)LLONG_MIN - (unsigned long long)LLONG_MAX);
+    assert(fw64.sum(0, 9) == (long long)u2);
+  }
+  {
+    __int128 half = (__int128)1 << 126;
+    std::vector<__int128> a = {half, half, half, -half};
+    FenwickTree<__int128> fw128(a);
+    unsigned __int128 uhalf = (unsigned __int128)half;
+    assert(fw128.sum(0, 2) == (__int128)(uhalf * 2));
+    assert(fw128.sum(0, 4) == (__int128)(uhalf * 2));
+    fw128.add(1, half);
+    assert(fw128.sum(0, 4) == (__int128)(uhalf * 3));
+  }
 }
 
 void test_binary_search_edges() {
@@ -255,17 +297,28 @@ template <typename T> void test_integer_type(std::mt19937_64& rng) {
   }
 }
 
+template <typename T>
+concept HasBinarySearch = requires(const FenwickTree<T>& fw, const T& x) {
+  fw.max_right(0, x);
+  fw.min_left(0, x);
+};
+
+static_assert(HasBinarySearch<int>);
+static_assert(HasBinarySearch<long long>);
+static_assert(HasBinarySearch<__int128>);
+static_assert(!HasBinarySearch<double>);
+static_assert(!HasBinarySearch<StaticModInt<998244353>>);
+static_assert(!HasBinarySearch<Vec2>);
+
 template <typename T> void test_float_type() {
   std::vector<T> init = {(T)1.5, (T)0.25, (T)2.0, (T)0.125, (T)4.5};
   FenwickTree<T> fw(init);
   assert(std::fabs((double)(fw.sum(2, 3) - (T)2.0)) < 1e-6);
-  assert(std::fabs((double)(fw.sum(5) - (T)8.375)) < 1e-6);
+  assert(std::fabs((double)(fw.sum(0, 5) - (T)8.375)) < 1e-6);
   assert(std::fabs((double)(fw.sum(1, 4) - (T)2.375)) < 1e-6);
   fw.add(1, (T)0.75);
   fw.set(4, (T)1.5);
-  assert(std::fabs((double)(fw.sum(5) - (T)6.125)) < 1e-6);
-  assert(fw.max_right((T)3.5) == 2);
-  assert(fw.min_left(5, (T)2.0) == 3);
+  assert(std::fabs((double)(fw.sum(0, 5) - (T)6.125)) < 1e-6);
 }
 
 void test_modint_and_custom_struct(std::mt19937_64& rng) {
@@ -294,12 +347,12 @@ void test_modint_and_custom_struct(std::mt19937_64& rng) {
     using Mint1 = StaticModInt<1>;
     FenwickTree<Mint1> fw(5);
     fw.add(2, Mint1(10));
-    assert(fw.sum(5) == Mint1(0));
+    assert(fw.sum(0, 5) == Mint1(0));
   }
   {
     FenwickTree<Vec2> fw0(0);
     assert(fw0.size() == 0);
-    assert(fw0.sum(0) == (Vec2{0, 0}));
+    assert(fw0.sum(0, 0) == (Vec2{0, 0}));
 
     std::uniform_int_distribution<long long> val_dist(-1000, 1000);
     for (int n : {1, 8, 25, 64}) {
@@ -314,7 +367,7 @@ void test_modint_and_custom_struct(std::mt19937_64& rng) {
       std::uniform_int_distribution<int> pos_dist(0, n - 1);
       std::uniform_int_distribution<int> bound_dist(0, n);
       for (int step = 0; step < n * 4; ++step) {
-        int op = (int)(rng() % 4);
+        int op = (int)(rng() % 3);
         if (op == 0) {
           int p = pos_dist(rng);
           Vec2 v{val_dist(rng), val_dist(rng)};
@@ -325,9 +378,6 @@ void test_modint_and_custom_struct(std::mt19937_64& rng) {
           Vec2 v{val_dist(rng), val_dist(rng)};
           fw.set(p, v);
           naive.set(p, v);
-        } else if (op == 2) {
-          int r = bound_dist(rng);
-          assert(fw.sum(r) == naive.sum(r));
         } else {
           int l = bound_dist(rng);
           int r = bound_dist(rng);
@@ -353,7 +403,7 @@ void test_random_comprehensive(std::mt19937_64& rng, int n, int ops) {
 
   std::uniform_int_distribution<int> pos_dist(0, n - 1);
   std::uniform_int_distribution<int> bound_dist(0, n);
-  std::uniform_int_distribution<int> op_dist(0, 3);
+  std::uniform_int_distribution<int> op_dist(0, 2);
 
   for (int step = 0; step < ops; ++step) {
     int op = op_dist(rng);
@@ -367,9 +417,6 @@ void test_random_comprehensive(std::mt19937_64& rng, int n, int ops) {
       long long x = init_dist(rng);
       fw.set(p, x);
       naive.set(p, x);
-    } else if (op == 2) {
-      int r = bound_dist(rng);
-      assert(fw.sum(r) == naive.sum(r));
     } else {
       int l = bound_dist(rng);
       int r = bound_dist(rng);
@@ -391,7 +438,7 @@ void test_random_binary_search(std::mt19937_64& rng, int n, int ops) {
 
   std::uniform_int_distribution<int> pos_dist(0, n - 1);
   std::uniform_int_distribution<int> bound_dist(0, n);
-  std::uniform_int_distribution<int> op_dist(0, 4);
+  std::uniform_int_distribution<int> op_dist(0, 3);
 
   for (int step = 0; step < ops; ++step) {
     int op = op_dist(rng);
@@ -406,12 +453,6 @@ void test_random_binary_search(std::mt19937_64& rng, int n, int ops) {
       fw.set(p, x);
       naive.set(p, x);
     } else if (op == 2) {
-      T total = naive.sum(n);
-      std::uniform_int_distribution<long long> lim_dist(0,
-                                                        (long long)total + 10);
-      T lim = (T)lim_dist(rng);
-      assert(fw.max_right(lim) == naive.max_right(0, lim));
-    } else if (op == 3) {
       int l = bound_dist(rng);
       T rem = naive.sum(l, n);
       std::uniform_int_distribution<long long> lim_dist(0, (long long)rem + 10);
@@ -463,7 +504,12 @@ int main() {
        {1, 2, 3, 4, 7, 8, 15, 16, 17, 32, 64, 127, 128, 511, 512, 513}) {
     int trials = (n <= 128) ? 3 : 1;
     for (int trial = 0; trial < trials; ++trial) {
-      if (n <= 128) test_random_comprehensive(rng, n, n * 3);
+      if (n <= 128) {
+        test_random_comprehensive(rng, n, n * 3);
+        test_random_binary_search<signed char>(rng, std::min(n, 5), 20);
+        test_random_binary_search<short>(rng, n, std::min(n * 3, 200));
+        test_random_binary_search<__int128>(rng, n, std::min(n * 3, 200));
+      }
       test_random_binary_search<int>(rng, n, std::min(n * 3, 400));
       test_random_binary_search<unsigned int>(rng, n, std::min(n * 3, 400));
       test_random_binary_search<long long>(rng, n, std::min(n * 3, 400));
