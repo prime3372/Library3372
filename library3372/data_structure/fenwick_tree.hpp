@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <bit>
 #include <cassert>
-#include <concepts>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -48,18 +47,15 @@ template <typename T, typename Storage> class ScalarImpl {
     if (n_ > 0) data_.assign(n_ + 1, Storage{});
   }
 
-  template <typename U>
-  explicit ScalarImpl(const std::vector<U>& a) : n_((int)a.size()) {
+  explicit ScalarImpl(const std::vector<T>& a) : n_((int)a.size()) {
     if (n_ == 0) return;
     data_.resize(n_ + 1);
-    for (int i = 0; i < n_; ++i) data_[i + 1] = (Storage)(T)a[i];
+    for (int i = 0; i < n_; ++i) data_[i + 1] = (Storage)a[i];
     for (int i = 1; i <= n_; ++i) {
       int j = i + (i & -i);
       if (j <= n_) add_assign(data_[j], data_[i]);
     }
   }
-
-  int size() const { return n_; }
 
   void add(int p, const T& x) { add_storage(p, (Storage)x); }
 
@@ -67,20 +63,18 @@ template <typename T, typename Storage> class ScalarImpl {
     add_storage(p, sub_val((Storage)x, get_storage(p)));
   }
 
-  T get(int p) const { return (T)get_storage(p); }
-
   T sum(int r) const { return (T)prefix_sum(r); }
 
   T sum(int l, int r) const { return (T)sub_val(prefix_sum(r), prefix_sum(l)); }
 
-  template <typename F> int max_right(F pred) const {
+  int max_right(const T& x) const {
     if (n_ == 0) return 0;
     Storage s{};
     int r = 0;
     for (int d = 1 << (std::bit_width((unsigned int)n_) - 1); d > 0; d >>= 1) {
       if (r + d <= n_) {
         Storage next_s = add_val(s, data_[r + d]);
-        if (pred((T)next_s)) {
+        if ((T)next_s <= x) {
           r += d;
           s = std::move(next_s);
         }
@@ -89,8 +83,8 @@ template <typename T, typename Storage> class ScalarImpl {
     return r;
   }
 
-  template <typename F> int max_right(int l, F pred) const {
-    if (l == 0) return max_right(std::move(pred));
+  int max_right(int l, const T& x) const {
+    if (l == 0) return max_right(x);
     if (l == n_) return n_;
     Storage base = prefix_sum(l);
     Storage s{};
@@ -98,7 +92,7 @@ template <typename T, typename Storage> class ScalarImpl {
     for (int d = 1 << (std::bit_width((unsigned int)n_) - 1); d > 0; d >>= 1) {
       if (r + d <= n_) {
         Storage next_s = add_val(s, data_[r + d]);
-        if (r + d <= l || pred((T)sub_val(next_s, base))) {
+        if (r + d <= l || (T)sub_val(next_s, base) <= x) {
           r += d;
           s = std::move(next_s);
         }
@@ -107,16 +101,16 @@ template <typename T, typename Storage> class ScalarImpl {
     return r;
   }
 
-  template <typename F> int min_left(int r, F pred) const {
+  int min_left(int r, const T& x) const {
     if (r == 0) return 0;
     Storage s_r = prefix_sum(r);
-    if (pred((T)s_r)) return 0;
+    if ((T)s_r <= x) return 0;
     Storage s{};
     int l = 0;
     for (int d = 1 << (std::bit_width((unsigned int)r) - 1); d > 0; d >>= 1) {
       if (l + d < r) {
         Storage next_s = add_val(s, data_[l + d]);
-        if (!pred((T)sub_val(s_r, next_s))) {
+        if (!((T)sub_val(s_r, next_s) <= x)) {
           l += d;
           s = std::move(next_s);
         }
@@ -124,6 +118,8 @@ template <typename T, typename Storage> class ScalarImpl {
     }
     return l + 1;
   }
+
+  int size() const { return n_; }
 
  private:
   static void add_assign(Storage& a, const Storage& b) {
@@ -210,23 +206,14 @@ template <typename T, typename Storage> class Avx2Impl {
     nodes_.assign(total_nodes_, Node{});
   }
 
-  template <typename U>
-  explicit Avx2Impl(const std::vector<U>& a) : n_((int)a.size()) {
+  explicit Avx2Impl(const std::vector<T>& a) : n_((int)a.size()) {
     if (n_ == 0) return;
     init_layout(n_);
     nodes_.resize(total_nodes_);
 
     int full_blocks = n_ >> log_b;
     for (int b = 0; b < full_blocks; ++b) {
-      const int base = b << log_b;
-      Storage total;
-      if constexpr (sizeof(U) == sizeof(Storage) && internal::is_integer_v<U>) {
-        total = prefix_sum_block<false>(&a[base], nodes_[b]);
-      } else {
-        Node tmp;
-        for (int j = 0; j < block_size; ++j) tmp.v[j] = (Storage)(T)a[base + j];
-        total = prefix_sum_block<true>(tmp.v, nodes_[b]);
-      }
+      Storage total = prefix_sum_block<false>(&a[b << log_b], nodes_[b]);
       if (height_ > 1) {
         nodes_[level_offset_[1] + (b >> log_b)].v[b & mask] = total;
       }
@@ -235,7 +222,7 @@ template <typename T, typename Storage> class Avx2Impl {
     if (rem > 0) {
       Node tmp{};
       int base = full_blocks << log_b;
-      for (int j = 0; j < rem; ++j) tmp.v[j] = (Storage)(T)a[base + j];
+      for (int j = 0; j < rem; ++j) tmp.v[j] = (Storage)a[base + j];
       Storage total = prefix_sum_block<true>(tmp.v, nodes_[full_blocks]);
       if (height_ > 1) {
         nodes_[level_offset_[1] + (full_blocks >> log_b)]
@@ -256,13 +243,9 @@ template <typename T, typename Storage> class Avx2Impl {
     }
   }
 
-  int size() const { return n_; }
-
   void add(int p, const T& x) { add_storage(p, (Storage)x); }
 
   void set(int p, const T& x) { add_storage(p, (Storage)x - get_storage(p)); }
-
-  T get(int p) const { return (T)get_storage(p); }
 
   T sum(int r) const { return (T)prefix_sum(r); }
 
@@ -280,7 +263,7 @@ template <typename T, typename Storage> class Avx2Impl {
     return (T)(sr - sl);
   }
 
-  template <typename F> int max_right(F pred) const {
+  int max_right(const T& x) const {
     if (n_ == 0) return 0;
     Storage s = 0;
     int node_idx = 0;
@@ -289,19 +272,8 @@ template <typename T, typename Storage> class Avx2Impl {
     for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
       int max_k = (int)std::min<long long>(block_size, (n_ - pos) >> shift);
-      int k = 0;
-      if (max_k == block_size) {
-        for (int step = block_size >> 1; step > 0; step >>= 1) {
-          if (pred((T)(s + node.v[k + step - 1]))) k += step;
-        }
-        if (k == block_size) return n_;
-      } else {
-        for (int step = block_size >> 1; step > 0; step >>= 1) {
-          if (k + step <= max_k && pred((T)(s + node.v[k + step - 1]))) {
-            k += step;
-          }
-        }
-      }
+      int k = first_match<false>(node, (Storage)x - s, max_k);
+      if (k == block_size) return n_;
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
       if (pos == n_) return n_;
@@ -310,8 +282,8 @@ template <typename T, typename Storage> class Avx2Impl {
     return (int)pos;
   }
 
-  template <typename F> int max_right(int l, F pred) const {
-    if (l == 0) return max_right(std::move(pred));
+  int max_right(int l, const T& x) const {
+    if (l == 0) return max_right(x);
     if (l == n_) return n_;
     Storage base = prefix_sum(l);
     Storage s = 0;
@@ -320,26 +292,21 @@ template <typename T, typename Storage> class Avx2Impl {
     int shift = (height_ - 1) * log_b;
     for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
-      int min_k = (pos < l)
-                      ? (int)std::min<long long>(block_size, (l - pos) >> shift)
-                      : 0;
       int max_k = (int)std::min<long long>(block_size, (n_ - pos) >> shift);
       int k = 0;
-      if (min_k == 0 && max_k == block_size) {
-        for (int step = block_size >> 1; step > 0; step >>= 1) {
-          if (pred((T)(s + node.v[k + step - 1] - base))) k += step;
-        }
-        if (k == block_size) return n_;
+      if (pos >= l) {
+        k = first_match<false>(node, (Storage)x - (s - base), max_k);
       } else {
+        int min_k = (int)std::min<long long>(block_size, (l - pos) >> shift);
         for (int step = block_size >> 1; step > 0; step >>= 1) {
           int cand = k + step;
           if (cand <= min_k ||
-              (cand <= max_k && pred((T)(s + node.v[cand - 1] - base)))) {
+              (cand <= max_k && (T)(s + node.v[cand - 1] - base) <= x)) {
             k = cand;
           }
         }
-        if (k == block_size) return n_;
       }
+      if (k == block_size) return n_;
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
       if (pos == n_) return n_;
@@ -348,10 +315,10 @@ template <typename T, typename Storage> class Avx2Impl {
     return (int)pos;
   }
 
-  template <typename F> int min_left(int r, F pred) const {
+  int min_left(int r, const T& x) const {
     if (r == 0) return 0;
     Storage s_r = prefix_sum(r);
-    if (pred((T)s_r)) return 0;
+    if ((T)s_r <= x) return 0;
     Storage s = 0;
     int node_idx = 0;
     long long pos = 0;
@@ -360,25 +327,15 @@ template <typename T, typename Storage> class Avx2Impl {
       const Node& node = nodes_[level_offset_[lvl] + node_idx];
       int max_k =
           (int)std::min<long long>(block_size - 1, (r - 1 - pos) >> shift);
-      int k = 0;
-      if (max_k == block_size - 1) {
-        for (int step = block_size >> 1; step > 0; step >>= 1) {
-          if (!pred((T)(s_r - (s + node.v[k + step - 1])))) k += step;
-        }
-      } else {
-        for (int step = block_size >> 1; step > 0; step >>= 1) {
-          if (k + step <= max_k &&
-              !pred((T)(s_r - (s + node.v[k + step - 1])))) {
-            k += step;
-          }
-        }
-      }
+      int k = first_match<true>(node, (s_r - s) - (Storage)x, max_k);
       if (k > 0) s += node.v[k - 1];
       pos += (long long)k << shift;
       node_idx = (node_idx << log_b) + k;
     }
     return (int)pos + 1;
   }
+
+  int size() const { return n_; }
 
  private:
   static constexpr int log_b = 3;
@@ -419,6 +376,46 @@ template <typename T, typename Storage> class Avx2Impl {
       v1 = _mm256_add_epi64(v1, _mm256_and_si256(vx, m1));
       _mm256_store_si256((__m256i*)node.v, v0);
       _mm256_store_si256((__m256i*)(node.v + 4), v1);
+    }
+  }
+
+  template <bool IsGe>
+  static int first_match(const Node& node, Storage bound, int max_k) {
+    if constexpr (sizeof(Storage) == 4) {
+      __m256i v = _mm256_load_si256((const __m256i*)node.v);
+      __m256i vb = _mm256_set1_epi32((int)bound);
+      if constexpr (internal::is_unsigned_integer_v<T>) {
+        __m256i sign = _mm256_set1_epi32((int)0x80000000U);
+        v = _mm256_xor_si256(v, sign);
+        vb = _mm256_xor_si256(vb, sign);
+      }
+      __m256i cmp =
+          IsGe ? _mm256_cmpgt_epi32(vb, v) : _mm256_cmpgt_epi32(v, vb);
+      unsigned int m = (unsigned int)_mm256_movemask_epi8(cmp);
+      if constexpr (IsGe) m = ~m;
+      return std::countr_zero((unsigned long long)m | (1ULL << (max_k * 4))) >>
+             2;
+    } else {
+      __m256i v0 = _mm256_load_si256((const __m256i*)node.v);
+      __m256i v1 = _mm256_load_si256((const __m256i*)(node.v + 4));
+      __m256i vb = _mm256_set1_epi64x((long long)bound);
+      if constexpr (internal::is_unsigned_integer_v<T>) {
+        __m256i sign = _mm256_set1_epi64x((long long)0x8000000000000000ULL);
+        v0 = _mm256_xor_si256(v0, sign);
+        v1 = _mm256_xor_si256(v1, sign);
+        vb = _mm256_xor_si256(vb, sign);
+      }
+      __m256i cmp0 =
+          IsGe ? _mm256_cmpgt_epi64(vb, v0) : _mm256_cmpgt_epi64(v0, vb);
+      __m256i cmp1 =
+          IsGe ? _mm256_cmpgt_epi64(vb, v1) : _mm256_cmpgt_epi64(v1, vb);
+      unsigned int m0 =
+          (unsigned int)_mm256_movemask_pd(_mm256_castsi256_pd(cmp0));
+      unsigned int m1 =
+          (unsigned int)_mm256_movemask_pd(_mm256_castsi256_pd(cmp1));
+      unsigned int m = m0 | (m1 << 4);
+      if constexpr (IsGe) m = (~m) & 0xFFU;
+      return std::countr_zero(m | (1U << max_k));
     }
   }
 
@@ -514,12 +511,6 @@ class FenwickTree {
 
   explicit FenwickTree(const std::vector<T>& a) : impl_(a) {}
 
-  template <typename U>
-    requires(!std::is_same_v<U, T> && std::constructible_from<T, const U&>)
-  explicit FenwickTree(const std::vector<U>& a) : impl_(a) {}
-
-  int size() const { return impl_.size(); }
-
   void add(int p, const T& x) {
     assert(0 <= p && p < size());
     impl_.add(p, x);
@@ -528,11 +519,6 @@ class FenwickTree {
   void set(int p, const T& x) {
     assert(0 <= p && p < size());
     impl_.set(p, x);
-  }
-
-  T get(int p) const {
-    assert(0 <= p && p < size());
-    return impl_.get(p);
   }
 
   T sum(int r) const {
@@ -545,28 +531,24 @@ class FenwickTree {
     return impl_.sum(l, r);
   }
 
-  template <typename F>
-    requires std::predicate<F&, const T&>
-  int max_right(F pred) const {
-    assert(pred(T{}));
-    return impl_.max_right(std::move(pred));
+  int max_right(const T& x) const {
+    assert(T{} <= x);
+    return impl_.max_right(x);
   }
 
-  template <typename F>
-    requires std::predicate<F&, const T&>
-  int max_right(int l, F pred) const {
+  int max_right(int l, const T& x) const {
     assert(0 <= l && l <= size());
-    assert(pred(T{}));
-    return impl_.max_right(l, std::move(pred));
+    assert(T{} <= x);
+    return impl_.max_right(l, x);
   }
 
-  template <typename F>
-    requires std::predicate<F&, const T&>
-  int min_left(int r, F pred) const {
+  int min_left(int r, const T& x) const {
     assert(0 <= r && r <= size());
-    assert(pred(T{}));
-    return impl_.min_left(r, std::move(pred));
+    assert(T{} <= x);
+    return impl_.min_left(r, x);
   }
+
+  int size() const { return impl_.size(); }
 
  private:
   using Storage = typename internal_fenwick_tree::StorageType<T>::type;
