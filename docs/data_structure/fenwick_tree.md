@@ -47,6 +47,8 @@ void FenwickTree::add(int p, const T& x);
 
 $a_p$ に $x$ を加算します。
 
+`T` が整数型の場合、加算後の値が `T` の範囲を超えても $2^w$ を法として合同な値に更新されます。ここで $w$ は `T` のビット幅です。
+
 ### 制約
 
 - $0 \leq p < n$
@@ -74,18 +76,16 @@ $a_p$ の値を $x$ に変更します。
 ## sum
 
 ```cpp
-T FenwickTree::sum(int r) const;  // (1)
-
-T FenwickTree::sum(int l, int r) const;  // (2)
+T FenwickTree::sum(int l, int r) const;
 ```
 
-- (1): $\sum_{i = 0}^{r - 1} a_i$ を返します。$r = 0$ のときは `T{}` を返します。
-- (2): $\sum_{i = l}^{r - 1} a_i$ を返します。$l = r$ のときは `T{}` を返します。
+$\sum_{i = l}^{r - 1} a_i$ を返します。$l = r$ のときは `T{}` を返します。
+
+`T` が整数型の場合、総和が `T` の範囲を超えても $2^w$ を法として合同な値が返ります。ここで $w$ は `T` のビット幅です。
 
 ### 制約
 
-- (1): $0 \leq r \leq n$
-- (2): $0 \leq l \leq r \leq n$
+- $0 \leq l \leq r \leq n$
 
 ### 計算量
 
@@ -94,27 +94,22 @@ T FenwickTree::sum(int l, int r) const;  // (2)
 ## max_right
 
 ```cpp
-int FenwickTree::max_right(const T& x) const;  // (1)
-
-int FenwickTree::max_right(int l, const T& x) const;  // (2)
+int FenwickTree::max_right(int l, const T& x) const;
 ```
 
 以下の条件をすべて満たす整数 $r$ を返します。
 
-- (1): $0 \leq r \leq n$
-  - $\mathrm{sum}(r) \leq x$ となる
-  - $r < n$ ならば $\mathrm{sum}(r + 1) \leq x$ が成り立たない
-- (2): $l \leq r \leq n$
-  - $\mathrm{sum}(l, r) \leq x$ となる
-  - $r < n$ ならば $\mathrm{sum}(l, r + 1) \leq x$ が成り立たない
+- $l \leq r \leq n$
+- $\mathrm{sum}(l, r) \leq x$ となる
+- $r < n$ ならば $\mathrm{sum}(l, r + 1) \leq x$ が成り立たない
 
 ### 制約
 
-- `T` は `<=` による比較が可能
-- $x \geq T\{\}$
-- (1): すべての $0 \leq i < n$ に対して $a_i \geq T\{\}$
-- (2): $0 \leq l \leq n$
-- (2): すべての $l \leq i < n$ に対して $a_i \geq T\{\}$
+- `T` は整数型
+- $0 \leq l \leq n$
+- $x \geq 0$
+- すべての $l \leq i < n$ に対して $a_i \geq 0$
+- $\sum_{i = l}^{n - 1} a_i$ がオーバーフローしない
 
 ### 計算量
 
@@ -134,10 +129,11 @@ int FenwickTree::min_left(int r, const T& x) const;
 
 ### 制約
 
-- `T` は `<=` による比較が可能
+- `T` は整数型
 - $0 \leq r \leq n$
-- $x \geq T\{\}$
-- すべての $0 \leq i < r$ に対して $a_i \geq T\{\}$
+- $x \geq 0$
+- すべての $0 \leq i < r$ に対して $a_i \geq 0$
+- $\sum_{i = 0}^{r - 1} a_i$ がオーバーフローしない
 
 ### 計算量
 
@@ -172,9 +168,9 @@ int main() {
   fw.add(2, 2);
   fw.set(0, 1);
   std::cout << fw.sum(2, 3) << "\n";  // 6
-  std::cout << fw.sum(5) << "\n";     // 14
+  std::cout << fw.sum(0, 5) << "\n";  // 14
 
-  int r = fw.max_right(8);
+  int r = fw.max_right(0, 8);
   std::cout << r << "\n";  // 3
   return 0;
 }
