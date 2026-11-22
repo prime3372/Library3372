@@ -63,30 +63,11 @@ template <typename T, typename Storage> class ScalarImpl {
     add_storage(p, sub_val((Storage)x, get_storage(p)));
   }
 
-  T sum(int r) const { return (T)prefix_sum(r); }
-
   T sum(int l, int r) const { return (T)sub_val(prefix_sum(r), prefix_sum(l)); }
 
-  int max_right(const T& x) const {
-    if (n_ == 0) return 0;
-    Storage s{};
-    int r = 0;
-    for (int d = 1 << (std::bit_width((unsigned int)n_) - 1); d > 0; d >>= 1) {
-      if (r + d <= n_) {
-        Storage next_s = add_val(s, data_[r + d]);
-        if ((T)next_s <= x) {
-          r += d;
-          s = std::move(next_s);
-        }
-      }
-    }
-    return r;
-  }
-
   int max_right(int l, const T& x) const {
-    if (l == 0) return max_right(x);
     if (l == n_) return n_;
-    Storage base = prefix_sum(l);
+    Storage base = (l > 0) ? prefix_sum(l) : Storage{};
     Storage s{};
     int r = 0;
     for (int d = 1 << (std::bit_width((unsigned int)n_) - 1); d > 0; d >>= 1) {
@@ -247,8 +228,6 @@ template <typename T, typename Storage> class Avx2Impl {
 
   void set(int p, const T& x) { add_storage(p, (Storage)x - get_storage(p)); }
 
-  T sum(int r) const { return (T)prefix_sum(r); }
-
   T sum(int l, int r) const {
     Storage sr = 0;
     Storage sl = 0;
@@ -263,29 +242,9 @@ template <typename T, typename Storage> class Avx2Impl {
     return (T)(sr - sl);
   }
 
-  int max_right(const T& x) const {
-    if (n_ == 0) return 0;
-    Storage s = 0;
-    int node_idx = 0;
-    long long pos = 0;
-    int shift = (height_ - 1) * log_b;
-    for (int lvl = height_ - 1; lvl >= 0; --lvl, shift -= log_b) {
-      const Node& node = nodes_[level_offset_[lvl] + node_idx];
-      int max_k = (int)std::min<long long>(block_size, (n_ - pos) >> shift);
-      int k = first_match<false>(node, (Storage)x - s, max_k);
-      if (k == block_size) return n_;
-      if (k > 0) s += node.v[k - 1];
-      pos += (long long)k << shift;
-      if (pos == n_) return n_;
-      node_idx = (node_idx << log_b) + k;
-    }
-    return (int)pos;
-  }
-
   int max_right(int l, const T& x) const {
-    if (l == 0) return max_right(x);
     if (l == n_) return n_;
-    Storage base = prefix_sum(l);
+    Storage base = (l > 0) ? prefix_sum(l) : 0;
     Storage s = 0;
     int node_idx = 0;
     long long pos = 0;
@@ -521,28 +480,22 @@ class FenwickTree {
     impl_.set(p, x);
   }
 
-  T sum(int r) const {
-    assert(0 <= r && r <= size());
-    return impl_.sum(r);
-  }
-
   T sum(int l, int r) const {
     assert(0 <= l && l <= r && r <= size());
     return impl_.sum(l, r);
   }
 
-  int max_right(const T& x) const {
-    assert(T{} <= x);
-    return impl_.max_right(x);
-  }
-
-  int max_right(int l, const T& x) const {
+  int max_right(int l, const T& x) const
+    requires internal::is_integer_v<T>
+  {
     assert(0 <= l && l <= size());
     assert(T{} <= x);
     return impl_.max_right(l, x);
   }
 
-  int min_left(int r, const T& x) const {
+  int min_left(int r, const T& x) const
+    requires internal::is_integer_v<T>
+  {
     assert(0 <= r && r <= size());
     assert(T{} <= x);
     return impl_.min_left(r, x);
