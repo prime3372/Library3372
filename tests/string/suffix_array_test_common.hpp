@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <limits>
 #include <numeric>
 #include <random>
@@ -18,15 +19,17 @@
 
 namespace {
 
-template <typename T> std::vector<int> naive_sa_vec(const std::vector<T>& s) {
+template <typename T, typename Compare = std::less<>>
+std::vector<int> naive_sa_vec(const std::vector<T>& s,
+                              Compare compare = Compare{}) {
   int n = (int)s.size();
   std::vector<int> sa(n);
   std::iota(sa.begin(), sa.end(), 0);
   std::sort(sa.begin(), sa.end(), [&](int l, int r) {
     int limit = n - (l > r ? l : r);
     for (int k = 0; k < limit; ++k) {
-      if (s[l + k] < s[r + k]) return true;
-      if (s[r + k] < s[l + k]) return false;
+      if (compare(s[l + k], s[r + k])) return true;
+      if (compare(s[r + k], s[l + k])) return false;
     }
     return l > r;
   });
@@ -50,6 +53,13 @@ struct LessOnly {
     return b < other.b;
   }
 };
+
+struct NoOrder {
+  int x;
+  int y;
+};
+
+bool cmp_int_desc(int a, int b) { return a > b; }
 
 void test_empty_and_tiny() {
   assert(library3372::suffix_array(std::string_view("")).empty());
@@ -340,6 +350,68 @@ void test_random_medium() {
   }
 }
 
+void test_custom_compare() {
+  std::mt19937_64 rng(0x517cc1b727220a95ULL);
+
+  // Overload disambiguation with non-int upper (calls (1), not (3)).
+  {
+    std::vector<int> v{2, 0, 1, 2};
+    auto expected = naive_sa_vec(v);
+    assert(library3372::suffix_array(v, 2LL) == expected);
+    assert(library3372::suffix_array(v, 2U) == expected);
+    assert(library3372::suffix_array(v, (short)2) == expected);
+  }
+
+  // Empty, n = 1, n = 2, small (n <= 32), boundary, and medium with custom
+  // comparators.
+  for (int n : {0, 1, 2, 10, 32, 33, 64, 150}) {
+    std::vector<int> v(n);
+    for (int& x : v) x = (int)(rng() % 50) - 25;
+    assert(library3372::suffix_array(v, std::less<>{}) == naive_sa_vec(v));
+    assert(library3372::suffix_array(v, std::less<int>{}) == naive_sa_vec(v));
+    assert(library3372::suffix_array(v, std::greater<>{}) ==
+           naive_sa_vec(v, std::greater<>{}));
+    assert(library3372::suffix_array(v, cmp_int_desc) ==
+           naive_sa_vec(v, cmp_int_desc));
+
+    auto mod_cmp = [](int a, int b) {
+      int ma = ((a % 5) + 5) % 5;
+      int mb = ((b % 5) + 5) % 5;
+      return ma < mb;
+    };
+    assert(library3372::suffix_array(v, mod_cmp) == naive_sa_vec(v, mod_cmp));
+
+    // All-equivalent under custom comparator.
+    auto all_eq_cmp = [](int, int) { return false; };
+    assert(library3372::suffix_array(v, all_eq_cmp) ==
+           naive_sa_vec(v, all_eq_cmp));
+  }
+
+  // std::vector<bool> with custom comparator.
+  for (int n : {0, 1, 2, 10, 32, 33, 80}) {
+    std::vector<bool> vb(n);
+    for (int i = 0; i < n; ++i) vb[i] = ((rng() & 1) != 0);
+    assert(library3372::suffix_array(vb, std::greater<>{}) ==
+           naive_sa_vec(vb, std::greater<>{}));
+  }
+
+  // Type without operator< sorted via custom comparator.
+  for (int n : {0, 1, 2, 20, 33, 120}) {
+    std::vector<NoOrder> vn(n);
+    for (auto& e : vn) e = NoOrder{(int)(rng() % 4), (int)(rng() % 3)};
+    auto cmp_x_only = [](const NoOrder& a, const NoOrder& b) {
+      return a.x < b.x;
+    };
+    auto cmp_rev = [](const NoOrder& a, const NoOrder& b) {
+      if (a.x != b.x) return a.x > b.x;
+      return a.y < b.y;
+    };
+    assert(library3372::suffix_array(vn, cmp_x_only) ==
+           naive_sa_vec(vn, cmp_x_only));
+    assert(library3372::suffix_array(vn, cmp_rev) == naive_sa_vec(vn, cmp_rev));
+  }
+}
+
 void run_all_suffix_array_tests() {
   test_empty_and_tiny();
   test_signed_and_unsigned_bytes();
@@ -348,6 +420,7 @@ void run_all_suffix_array_tests() {
   test_integer_types_and_radix_paths();
   test_non_integer_types();
   test_random_medium();
+  test_custom_compare();
 }
 
 }  // namespace

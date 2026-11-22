@@ -14,7 +14,9 @@
 #include <algorithm>
 #include <bit>
 #include <cassert>
+#include <concepts>
 #include <cstring>
+#include <functional>
 #include <numeric>
 #include <string_view>
 #include <type_traits>
@@ -30,13 +32,15 @@ inline constexpr int kThresholdNaive = 32;
 inline constexpr int kTagBit = (int)0x80000000U;
 inline constexpr int kLmsBit = 0x40000000;
 
-template <typename T> inline void sa_naive(const T* s, int n, int* sa) {
+template <typename Seq, typename Compare = std::less<>>
+inline void sa_naive(const Seq& s, int n, int* sa,
+                     Compare compare = Compare{}) {
   for (int i = 0; i < n; ++i) sa[i] = i;
-  auto cmp = [s, n](int l, int r) {
+  auto cmp = [&](int l, int r) {
     int limit = n - (l > r ? l : r);
     for (int k = 0; k < limit; ++k) {
-      if (s[l + k] < s[r + k]) return true;
-      if (s[r + k] < s[l + k]) return false;
+      if (compare(s[l + k], s[r + k])) return true;
+      if (compare(s[r + k], s[l + k])) return false;
     }
     return l > r;
   };
@@ -639,21 +643,23 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
   return sa;
 }
 
-template <typename T>
-std::vector<int> suffix_array_compress_sort(const std::vector<T>& s) {
+template <typename T, typename Compare>
+std::vector<int> suffix_array_compress_sort(const std::vector<T>& s,
+                                            Compare compare) {
   int n = (int)s.size();
   std::vector<int> idx(n);
   std::iota(idx.begin(), idx.end(), 0);
-  std::sort(idx.begin(), idx.end(), [&](int l, int r) { return s[l] < s[r]; });
+  std::sort(idx.begin(), idx.end(),
+            [&](int l, int r) { return compare(s[l], s[r]); });
   std::vector<int> s2(n);
   int now = 0;
   s2[idx[0]] = 0;
   for (int i = 1; i < n; ++i) {
-    if (s[idx[i - 1]] < s[idx[i]]) ++now;
+    if (compare(s[idx[i - 1]], s[idx[i]])) ++now;
     s2[idx[i]] = now;
   }
-  std::vector<int> sa(n);
   if (now == n - 1) return idx;
+  std::vector<int> sa(n);
   std::vector<int> cnt_pool;
   std::vector<int> bkt;
   cnt_pool.reserve(now + 1 + n / 2);
@@ -712,33 +718,46 @@ inline std::vector<int> suffix_array(std::string_view s) {
   return sa;
 }
 
-template <typename T> std::vector<int> suffix_array(const std::vector<T>& s) {
+template <typename T, typename Compare = std::less<>>
+  requires requires(Compare& cmp, const T& a, const T& b) {
+    { cmp(a, b) } -> std::convertible_to<bool>;
+  }
+std::vector<int> suffix_array(const std::vector<T>& s,
+                              Compare compare = Compare{}) {
   int n = (int)s.size();
   assert(n < (1 << 30));
   if (n == 0) return {};
   if (n == 1) return {0};
+  constexpr bool kIsDefaultLess =
+      std::is_same_v<std::decay_t<Compare>, std::less<>> ||
+      std::is_same_v<std::decay_t<Compare>, std::less<T>>;
   if constexpr (std::is_same_v<T, bool>) {
-    std::vector<unsigned char> s2(n);
-    for (int i = 0; i < n; ++i) s2[i] = (unsigned char)s[i];
-    std::vector<int> sa(n);
     if (n <= internal_suffix_array::kThresholdNaive) {
-      internal_suffix_array::sa_naive(s2.data(), n, sa.data());
+      std::vector<int> sa(n);
+      internal_suffix_array::sa_naive(s, n, sa.data(), compare);
       return sa;
     }
-    std::vector<int> cnt_pool;
-    std::vector<int> bkt;
-    cnt_pool.reserve(2 + n);
-    bkt.reserve(n);
-    internal_suffix_array::sa_is_core(s2.data(), n, 1, sa.data(), cnt_pool, 0,
-                                      bkt);
-    return sa;
+    if constexpr (kIsDefaultLess) {
+      std::vector<unsigned char> s2(n);
+      for (int i = 0; i < n; ++i) s2[i] = (unsigned char)s[i];
+      std::vector<int> sa(n);
+      std::vector<int> cnt_pool;
+      std::vector<int> bkt;
+      cnt_pool.reserve(2 + n);
+      bkt.reserve(n);
+      internal_suffix_array::sa_is_core(s2.data(), n, 1, sa.data(), cnt_pool, 0,
+                                        bkt);
+      return sa;
+    } else {
+      return internal_suffix_array::suffix_array_compress_sort(s, compare);
+    }
   } else {
     if (n <= internal_suffix_array::kThresholdNaive) {
       std::vector<int> sa(n);
-      internal_suffix_array::sa_naive(s.data(), n, sa.data());
+      internal_suffix_array::sa_naive(s.data(), n, sa.data(), compare);
       return sa;
     }
-    if constexpr (internal::is_integer_v<T>) {
+    if constexpr (kIsDefaultLess && internal::is_integer_v<T>) {
       if constexpr (sizeof(T) == 1) {
         std::vector<int> sa(n);
         std::vector<int> cnt_pool;
@@ -806,10 +825,10 @@ template <typename T> std::vector<int> suffix_array(const std::vector<T>& s) {
         if (n >= 256) {
           return internal_suffix_array::suffix_array_radix(s, min_v, range);
         }
-        return internal_suffix_array::suffix_array_compress_sort(s);
+        return internal_suffix_array::suffix_array_compress_sort(s, compare);
       }
     } else {
-      return internal_suffix_array::suffix_array_compress_sort(s);
+      return internal_suffix_array::suffix_array_compress_sort(s, compare);
     }
   }
 }
