@@ -362,13 +362,14 @@ void test_random_comprehensive(std::mt19937_64& rng, int n, int ops) {
   assert_all_match(ft, naive);
 }
 
+template <typename T>
 void test_random_binary_search(std::mt19937_64& rng, int n, int ops) {
   std::uniform_int_distribution<long long> val_dist(0, 20);
-  std::vector<long long> init(n);
-  for (int i = 0; i < n; ++i) init[i] = val_dist(rng);
+  std::vector<T> init(n);
+  for (int i = 0; i < n; ++i) init[i] = (T)val_dist(rng);
 
-  FenwickTree<long long> ft(init);
-  NaiveFenwickTree<long long> naive(init);
+  FenwickTree<T> ft(init);
+  NaiveFenwickTree<T> naive(init);
 
   std::uniform_int_distribution<int> pos_dist(0, n - 1);
   std::uniform_int_distribution<int> bound_dist(0, n);
@@ -378,33 +379,35 @@ void test_random_binary_search(std::mt19937_64& rng, int n, int ops) {
     int op = op_dist(rng);
     if (op == 0) {
       int p = pos_dist(rng);
-      long long x = val_dist(rng);
+      T x = (T)val_dist(rng);
       ft.add(p, x);
       naive.add(p, x);
     } else if (op == 1) {
       int p = pos_dist(rng);
-      long long x = val_dist(rng);
+      T x = (T)val_dist(rng);
       ft.set(p, x);
       naive.set(p, x);
     } else if (op == 2) {
-      long long total = naive.sum(n);
-      std::uniform_int_distribution<long long> lim_dist(0, total + 10);
-      long long lim = lim_dist(rng);
-      auto pred = [&](long long s) { return s <= lim; };
+      T total = naive.sum(n);
+      std::uniform_int_distribution<long long> lim_dist(0,
+                                                        (long long)total + 10);
+      T lim = (T)lim_dist(rng);
+      auto pred = [&](T s) { return s <= lim; };
       assert(ft.max_right(pred) == naive.max_right(0, pred));
     } else if (op == 3) {
       int l = bound_dist(rng);
-      long long rem = naive.sum(l, n);
-      std::uniform_int_distribution<long long> lim_dist(0, rem + 10);
-      long long lim = lim_dist(rng);
-      auto pred = [&](long long s) { return s <= lim; };
+      T rem = naive.sum(l, n);
+      std::uniform_int_distribution<long long> lim_dist(0, (long long)rem + 10);
+      T lim = (T)lim_dist(rng);
+      auto pred = [&](T s) { return s <= lim; };
       assert(ft.max_right(l, pred) == naive.max_right(l, pred));
     } else {
       int r = bound_dist(rng);
-      long long pref = naive.sum(r);
-      std::uniform_int_distribution<long long> lim_dist(0, pref + 10);
-      long long lim = lim_dist(rng);
-      auto pred = [&](long long s) { return s <= lim; };
+      T pref = naive.sum(r);
+      std::uniform_int_distribution<long long> lim_dist(0,
+                                                        (long long)pref + 10);
+      T lim = (T)lim_dist(rng);
+      auto pred = [&](T s) { return s <= lim; };
       assert(ft.min_left(r, pred) == naive.min_left(r, pred));
     }
   }
@@ -441,10 +444,13 @@ int main() {
 
   test_modint_and_custom_struct(rng);
 
-  for (int n : {1, 2, 3, 4, 7, 8, 15, 16, 17, 32, 64, 127, 128}) {
-    for (int trial = 0; trial < 3; ++trial) {
-      test_random_comprehensive(rng, n, n * 3);
-      test_random_binary_search(rng, n, n * 3);
+  for (int n :
+       {1, 2, 3, 4, 7, 8, 15, 16, 17, 32, 64, 127, 128, 511, 512, 513}) {
+    int trials = (n <= 128) ? 3 : 1;
+    for (int trial = 0; trial < trials; ++trial) {
+      if (n <= 128) test_random_comprehensive(rng, n, n * 3);
+      test_random_binary_search<int>(rng, n, std::min(n * 3, 400));
+      test_random_binary_search<long long>(rng, n, std::min(n * 3, 400));
     }
   }
   return 0;
