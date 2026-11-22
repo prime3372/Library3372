@@ -43,6 +43,16 @@
       "args": ["10000", "10000", "20"]
     },
     {
+      "name": "hlpp_worst_small",
+      "generator": "hlpp_worst.cpp",
+      "args": ["70", "300", "35", "40", "60"]
+    },
+    {
+      "name": "hlpp_worst_large",
+      "generator": "hlpp_worst.cpp",
+      "args": ["350", "1000", "120", "120", "250"]
+    },
+    {
       "name": "iter_killer",
       "generator": "iter_killer.cpp",
       "args": ["20000", "40000"]
