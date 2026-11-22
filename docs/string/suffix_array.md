@@ -5,28 +5,31 @@
 ## suffix_array
 
 ```cpp
-std::vector<int> suffix_array(const std::vector<int>& s, int upper);  // (1)
-std::vector<int> suffix_array(std::string_view s);                    // (2)
+std::vector<int> suffix_array(std::string_view s);                    // (1)
+std::vector<int> suffix_array(const std::vector<int>& s, int upper);  // (2)
 
-template <typename T, typename Compare = std::less<>>
-std::vector<int> suffix_array(const std::vector<T>& s,
-                              Compare compare = Compare{});  // (3)
+template <typename T>
+std::vector<int> suffix_array(const std::vector<T>& s);  // (3)
+
+template <typename T, typename Compare>
+std::vector<int> suffix_array(const std::vector<T>& s, Compare compare);  // (4)
 ```
 
-長さ $n$ の列 `s` に対する接尾辞配列を長さ $n$ の `std::vector<int>` として返します。戻り値 `sa` は $0, 1, \dots, n - 1$ の順列であり、`s[sa[i]..]` が辞書順で $i$ 番目の接尾辞になります。`(3)` では 2 要素の比較に `compare` を用い、省略時は `<` 演算子で比較します。
+長さ $n$ の列 `s` に対する接尾辞配列を長さ $n$ の `std::vector<int>` として返します。戻り値 `sa` は $0, 1, \dots, n - 1$ の順列であり、`s[sa[i]..]` が辞書順で $i$ 番目の接尾辞になります。(4) では比較関数として `compare` を指定します。
 
 ### 制約
 
-- (1), (2), (3): $n < 2^{30}$
-- (1): $\mathrm{upper} \geq 0$
-- (1): $0 \leq s_i \leq \mathrm{upper}$
-- (3): `compare` は要素間の狭義弱順序を定める二項述語
+- $n < 2^{30}$
+- (2): $0 \leq s_i \leq \mathrm{upper}$
+- (3): `operator<` は要素間の狭義弱順序を定める二項述語
+- (4): `compare` は要素間の狭義弱順序を定める二項述語
 
 ### 計算量
 
-- (1): $O(n + \mathrm{upper})$
-- (2): $O(n)$
-- (3): デフォルトの比較関数を使い、かつ `T` が整数型の場合は $O(n)$、そうでない場合は $O(n \log n)$
+- (1): $O(n)$
+- (2): $O(n + \mathrm{upper})$
+- (3): `T` が整数型の場合は $O(n)$、そうでない場合は $O(n \log n)$
+- (4): $O(n \log n)$
 
 ## 使用例
 
