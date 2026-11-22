@@ -37,32 +37,30 @@ int main() {
   }
 
   library3372::internal::Timer timer;
-  library3372::FenwickTree<long long> ft(init);
+  library3372::FenwickTree<long long> fw(init);
   double build_sec = timer.elapsed();
 
   timer.reset();
   unsigned long long ans_hash = 0;
   for (const auto& qry : queries) {
     if (qry.type == 0) {
-      ft.add(qry.a, qry.b);
+      fw.add(qry.a, qry.b);
     } else if (qry.type == 1) {
-      ft.set(qry.a, qry.b);
+      fw.set(qry.a, qry.b);
     } else if (qry.type == 2) {
-      long long res = ft.get(qry.a);
+      long long res = fw.sum(qry.a, qry.a + 1);
       ans_hash = library3372::internal::hash_combine(ans_hash,
                                                      (unsigned long long)res);
     } else if (qry.type == 3) {
-      long long res = ft.sum(qry.a, (int)qry.b);
+      long long res = fw.sum(qry.a, (int)qry.b);
       ans_hash = library3372::internal::hash_combine(ans_hash,
                                                      (unsigned long long)res);
     } else if (qry.type == 4) {
-      long long lim = qry.b;
-      int res = ft.max_right(qry.a, [&](long long s) { return s <= lim; });
+      int res = fw.max_right(qry.a, qry.b);
       ans_hash = library3372::internal::hash_combine(ans_hash,
                                                      (unsigned long long)res);
     } else {
-      long long lim = qry.b;
-      int res = ft.min_left(qry.a, [&](long long s) { return s <= lim; });
+      int res = fw.min_left(qry.a, qry.b);
       ans_hash = library3372::internal::hash_combine(ans_hash,
                                                      (unsigned long long)res);
     }
