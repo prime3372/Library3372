@@ -44,7 +44,7 @@ void SccGraph::add_edge(int from, int to);
 void SccGraph::build();
 ```
 
-強連結成分分解を行い、`count_groups()`、`ids()`、`groups()` で取得できる結果をすべて構築します。
+強連結成分分解を行います。
 
 ### 計算量
 
@@ -56,7 +56,7 @@ void SccGraph::build();
 void SccGraph::build_ids();
 ```
 
-強連結成分分解を行い、`count_groups()` および `ids()` で取得できる結果のみを構築します。`groups()` の結果は構築されません。
+強連結成分分解を行います。`count_groups()` および `ids()` で取得できる結果のみを構築します。
 
 ### 計算量
 
