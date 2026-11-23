@@ -1,6 +1,6 @@
 # Convolution
 
-2 つの数列の畳み込みを計算する関数群です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+2 つの数列の剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m) + \log \mathrm{mod})$ で求めます。
 
 ## convolution
 
@@ -28,24 +28,6 @@ std::vector<T> convolution(const std::vector<T>& a,
 
 - $n = |a| + |b|$ として $O(n \log n + \log m)$
 
-## convolution_ll
-
-```cpp
-std::vector<long long> convolution_ll(const std::vector<long long>& a,
-                                      const std::vector<long long>& b);
-```
-
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \sum_{i + j = k} a_i b_j$ として計算し、返します。`a` または `b` が空の場合は空の `std::vector` を返します。
-
-### 制約
-
-- $|a| + |b| - 1 \leq 2^{24}$
-- 出力の各要素を $c_k$ として $|c_k| \leq 2252081290784276480$
-
-### 計算量
-
-- $n = |a| + |b|$ として $O(n \log n)$
-
 ## 使用例
 
 ```cpp
@@ -71,13 +53,6 @@ int main() {
   for (int x : ci) std::cout << x << " ";
   std::cout << "\n";
   // 1 4 11 18 20 16
-
-  std::vector<long long> al = {1000000000LL, 1000000000LL};
-  std::vector<long long> bl = {1000000000LL, 1000000000LL};
-  std::vector<long long> cl = library3372::convolution_ll(al, bl);
-  for (long long x : cl) std::cout << x << " ";
-  std::cout << "\n";
-  // 1000000000000000000 2000000000000000000 1000000000000000000
 
   return 0;
 }
