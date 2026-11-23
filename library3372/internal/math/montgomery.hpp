@@ -102,6 +102,7 @@ class Montgomery64 {
   }
 
   constexpr unsigned long long mod() const { return mod_; }
+  constexpr unsigned long long neg_inv() const { return 0ULL - inv_; }
   constexpr unsigned long long one() const { return one_; }
   constexpr unsigned long long r2() const { return r2_; }
 
@@ -130,6 +131,19 @@ class Montgomery64 {
   constexpr unsigned long long mul(unsigned long long a,
                                    unsigned long long b) const {
     return reduce((unsigned __int128)a * b);
+  }
+
+  // Lazy reduction returning a value in [0, 2 * mod) when mod < 2^62.
+  constexpr unsigned long long reduce_2m(unsigned __int128 t) const {
+    assert(mod_ < (1ULL << 62));
+    unsigned long long q = (unsigned long long)t * neg_inv();
+    return (unsigned long long)((t + (unsigned __int128)q * mod_) >> 64);
+  }
+
+  // Returns (a * b * R^-1) mod mod in [0, 2 * mod) when mod < 2^62.
+  constexpr unsigned long long mul_2m(unsigned long long a,
+                                      unsigned long long b) const {
+    return reduce_2m((unsigned __int128)a * b);
   }
 
   constexpr unsigned long long pow(unsigned long long base,

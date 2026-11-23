@@ -363,14 +363,10 @@ inline void last3_fwd_pair(unsigned int* ptr, __m256i w4, __m256i w2,
   __m256i a1 = add_lim_avx2(y0, r1, c.lim);
   __m256i b1 = sub_lim_avx2(y0, r1, c.lim);
 
-  __m256i z0 = _mm256_unpacklo_epi32(a1, b1);
-  __m256i z1 = _mm256_unpackhi_epi32(a1, b1);
-  __m256i lo_out = _mm256_unpacklo_epi64(z0, z1);
-  __m256i hi_out = _mm256_unpackhi_epi64(z0, z1);
-  _mm256_store_si256((__m256i*)ptr,
-                     _mm256_permute2x128_si256(lo_out, hi_out, 0x20));
-  _mm256_store_si256((__m256i*)(ptr + 8),
-                     _mm256_permute2x128_si256(lo_out, hi_out, 0x31));
+  // Skip bit-reversal unshuffling here: pointwise multiplication commutes with
+  // permutation, and last3_inv_pair consumes this [a1, b1] layout directly.
+  _mm256_store_si256((__m256i*)ptr, a1);
+  _mm256_store_si256((__m256i*)(ptr + 8), b1);
 }
 
 template <int m>
@@ -456,21 +452,22 @@ inline void radix4_stage_inv(unsigned int* a, int n, int h, unsigned int iw1_s,
   }
 }
 
-template <int m>
-inline void last3_inv_pair(unsigned int* ptr, __m256i iw4, __m256i iw2,
-                           __m256i iw1, const Avx2MontConsts& c) {
+template <int m, bool SameInput>
+inline void last3_inv_pair(unsigned int* ptr, const unsigned int* b_ptr,
+                           __m256i iw4, __m256i iw2, __m256i iw1,
+                           const Avx2MontConsts& c) {
   constexpr bool lazy = NttInfo<m>::lazy;
-  __m256i v0 = _mm256_load_si256((const __m256i*)ptr);
-  __m256i v1 = _mm256_load_si256((const __m256i*)(ptr + 8));
-
-  __m256i lo = _mm256_permute2x128_si256(v0, v1, 0x20);
-  __m256i hi = _mm256_permute2x128_si256(v0, v1, 0x31);
-  __m256i x0 = _mm256_unpacklo_epi64(lo, hi);
-  __m256i x1 = _mm256_unpackhi_epi64(lo, hi);
-  __m256i y0 = _mm256_castps_si256(_mm256_shuffle_ps(
-      _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0x88));
-  __m256i y1 = _mm256_castps_si256(_mm256_shuffle_ps(
-      _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0xDD));
+  __m256i y0 = _mm256_load_si256((const __m256i*)ptr);
+  __m256i y1 = _mm256_load_si256((const __m256i*)(ptr + 8));
+  if constexpr (SameInput) {
+    y0 = mont_mul_avx2<lazy>(y0, y0, c);
+    y1 = mont_mul_avx2<lazy>(y1, y1, c);
+  } else {
+    __m256i m0 = _mm256_load_si256((const __m256i*)b_ptr);
+    __m256i m1 = _mm256_load_si256((const __m256i*)(b_ptr + 8));
+    y0 = mont_mul_avx2<lazy>(y0, m0, c);
+    y1 = mont_mul_avx2<lazy>(y1, m1, c);
+  }
 
   __m256i a1 = add_lim_avx2(y0, y1, c.lim);
   __m256i d1 = _mm256_sub_epi32(_mm256_add_epi32(y0, c.lim), y1);
@@ -495,11 +492,12 @@ inline void last3_inv_pair(unsigned int* ptr, __m256i iw4, __m256i iw2,
                      _mm256_permute2x128_si256(a4, b4, 0x31));
 }
 
-template <int m>
-inline void last3_inv(unsigned int* a, int t_end, __m256i iw4_0, __m256i iw2_0,
-                      __m256i iw1_0, const Avx2MontConsts& c) {
+template <int m, bool SameInput>
+inline void last3_inv(unsigned int* a, const unsigned int* b, int t_end,
+                      __m256i iw4_0, __m256i iw2_0, __m256i iw1_0,
+                      const Avx2MontConsts& c) {
   if (t_end == 1) {
-    last3_inv_pair<m>(a, iw4_0, iw2_0, iw1_0, c);
+    last3_inv_pair<m, SameInput>(a, b, iw4_0, iw2_0, iw1_0, c);
     return;
   }
   const auto& info = ntt_info<m>;
@@ -512,9 +510,12 @@ inline void last3_inv(unsigned int* a, int t_end, __m256i iw4_0, __m256i iw2_0,
       iw1_0, _mm256_set1_epi32((int)info.istep[3][0]), c);
   int u_end = t_end >> 1;
   for (int u = 0; u < u_end; ++u) {
-    unsigned int* ptr = a + (u << 5);
-    last3_inv_pair<m>(ptr, iw4_0, iw2_0, iw1_0, c);
-    last3_inv_pair<m>(ptr + 16, iw4_1, iw2_1, iw1_1, c);
+    int off = u << 5;
+    unsigned int* ptr = a + off;
+    const unsigned int* b_ptr = SameInput ? nullptr : b + off;
+    last3_inv_pair<m, SameInput>(ptr, b_ptr, iw4_0, iw2_0, iw1_0, c);
+    last3_inv_pair<m, SameInput>(ptr + 16, SameInput ? nullptr : b_ptr + 16,
+                                 iw4_1, iw2_1, iw1_1, c);
     if (u + 1 < u_end) {
       int k = std::countr_one((unsigned int)u);
       __m256i s4 = _mm256_set1_epi32((int)info.istep[2][k]);
@@ -607,7 +608,9 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
     for (; h > 5; h -= 2) {
       radix4_stage_fwd<m>(a, n, h, info.mont.one(), c, vimag);
     }
-    if (h == 5) radix4_stage_fwd<m, 8>(a, n, 5, info.mont.one(), c, vimag);
+    if (h == 5) {
+      radix4_stage_fwd<m, 8>(a, n, 5, info.mont.one(), c, vimag);
+    }
     last3_fwd<m>(a, n >> 4, w4, w2, w1, c);
     return;
   }
@@ -644,7 +647,8 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
   }
 }
 
-template <int m> void butterfly_inv(unsigned int* a, int n) {
+template <int m, bool SameInput>
+void butterfly_inv(unsigned int* a, const unsigned int* b, int n) {
   const auto& info = ntt_info<m>;
   constexpr unsigned int mod = NttInfo<m>::mod;
   constexpr bool lazy = NttInfo<m>::lazy;
@@ -653,6 +657,10 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   int log_n = std::countr_zero((unsigned int)n);
 
   if (n < 16) {
+    for (int i = 0; i < n; ++i) {
+      unsigned int rhs = SameInput ? a[i] : b[i];
+      a[i] = info.mont.mul(a[i], rhs);
+    }
     for (int len = 1; len < n; len <<= 1) {
       int blocks = n / (len << 1);
       unsigned int irot = info.mont.one();
@@ -681,7 +689,7 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   __m256i iw1 = _mm256_load_si256((const __m256i*)info.iw1_init);
 
   if (log_n <= 13) {
-    last3_inv<m>(a, n >> 4, iw4, iw2, iw1, c);
+    last3_inv<m, SameInput>(a, b, n >> 4, iw4, iw2, iw1, c);
     int h = 5;
     if (h <= log_n) {
       radix4_stage_inv<m, 8>(a, n, 5, info.mont.one(), c, viimag);
@@ -706,8 +714,10 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
                              info.mont.one(), info.mont.one()};
   int s_end = n >> 13;
   for (int s = 0; s < s_end; ++s) {
-    unsigned int* blk = a + (s << 13);
-    last3_inv<m>(blk, 1 << 9, iw4, iw2, iw1, c);
+    int blk_off = s << 13;
+    unsigned int* blk = a + blk_off;
+    const unsigned int* b_blk = SameInput ? nullptr : b + blk_off;
+    last3_inv<m, SameInput>(blk, b_blk, 1 << 9, iw4, iw2, iw1, c);
     radix4_stage_inv<m, 8>(blk, 1 << 13, 5, iw_init[4], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 7, iw_init[3], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 9, iw_init[2], c, viimag);
@@ -746,22 +756,6 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
       _mm256_store_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
       _mm256_store_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
     }
-  }
-}
-
-template <int m>
-void pointwise_mul(unsigned int* a, const unsigned int* b, int n) {
-  constexpr unsigned int mod = NttInfo<m>::mod;
-  constexpr bool lazy = NttInfo<m>::lazy;
-  const Avx2MontConsts c = Avx2MontConsts::create(mod, lazy ? mod * 2U : mod);
-  int i = 0;
-  for (; i + 8 <= n; i += 8) {
-    __m256i va = _mm256_load_si256((const __m256i*)(a + i));
-    __m256i vb = _mm256_load_si256((const __m256i*)(b + i));
-    _mm256_store_si256((__m256i*)(a + i), mont_mul_avx2<lazy>(va, vb, c));
-  }
-  for (; i < n; ++i) {
-    a[i] = mont_mul_scalar<lazy>(a[i], b[i], ntt_info<m>.mont);
   }
 }
 
@@ -1016,7 +1010,17 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
   }
 }
 
-template <int m> void butterfly_inv(unsigned int* a, int n) {
+template <int m, bool SameInput>
+inline void pointwise_mul_scalar(unsigned int* a, const unsigned int* b,
+                                 int n) {
+  for (int i = 0; i < n; ++i) {
+    unsigned int rhs = SameInput ? a[i] : b[i];
+    a[i] = mont_mul_scalar<NttInfo<m>::lazy>(a[i], rhs, ntt_info<m>.mont);
+  }
+}
+
+template <int m, bool SameInput>
+void butterfly_inv(unsigned int* a, const unsigned int* b, int n) {
   const auto& info = ntt_info<m>;
   constexpr unsigned int mod = NttInfo<m>::mod;
   constexpr bool lazy = NttInfo<m>::lazy;
@@ -1025,6 +1029,7 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
 
   int h = 2;
   if (log_n <= 12) {
+    pointwise_mul_scalar<m, SameInput>(a, b, n);
     if (2 <= log_n) radix4_stage_scalar_inv<m, 1>(a, n, 2, info.mont.one());
     if (4 <= log_n) radix4_stage_scalar_inv<m, 4>(a, n, 4, info.mont.one());
     for (h = 6; h <= log_n; h += 2) {
@@ -1046,7 +1051,10 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
                              info.mont.one(), info.mont.one(), info.mont.one()};
   int s_end = n >> 12;
   for (int s = 0; s < s_end; ++s) {
-    unsigned int* blk = a + (s << 12);
+    int blk_off = s << 12;
+    unsigned int* blk = a + blk_off;
+    pointwise_mul_scalar<m, SameInput>(blk, SameInput ? nullptr : b + blk_off,
+                                       1 << 12);
     radix4_stage_scalar_inv<m, 1>(blk, 1 << 12, 2, iw_init[5]);
     radix4_stage_scalar_inv<m, 4>(blk, 1 << 12, 4, iw_init[4]);
     radix4_stage_scalar_inv<m>(blk, 1 << 12, 6, iw_init[3]);
@@ -1084,13 +1092,6 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   }
 }
 
-template <int m>
-void pointwise_mul(unsigned int* a, const unsigned int* b, int n) {
-  for (int i = 0; i < n; ++i) {
-    a[i] = mont_mul_scalar<NttInfo<m>::lazy>(a[i], b[i], ntt_info<m>.mont);
-  }
-}
-
 template <int m, typename OutPtr, typename Transform>
 void scale_out_impl(const unsigned int* src, OutPtr dst, int n,
                     unsigned int factor, Transform&& transform) {
@@ -1122,11 +1123,10 @@ template <int m>
 unsigned int finish_ntt_convolution(unsigned int* a, unsigned int* b, int z,
                                     bool same_input) {
   if (same_input) {
-    internal_ntt::pointwise_mul<m>(a, a, z);
+    internal_ntt::butterfly_inv<m, true>(a, nullptr, z);
   } else {
-    internal_ntt::pointwise_mul<m>(a, b, z);
+    internal_ntt::butterfly_inv<m, false>(a, b, z);
   }
-  internal_ntt::butterfly_inv<m>(a, z);
 
   const auto& info = ntt_info<m>;
   unsigned int iz_mont =
@@ -1259,21 +1259,22 @@ constexpr unsigned long long ntt_primitive_root64(long long m) {
 template <long long m> struct NttInfo64 {
   static constexpr bool valid = (m >= 2 && is_prime(m));
   static constexpr unsigned long long mod = (unsigned long long)(valid ? m : 3);
+  static constexpr bool lazy = (mod < (1ULL << 62));
   static constexpr int rank2 = std::countr_zero(mod - 1);
   static constexpr Montgomery64 mont{mod == 2 ? 3ULL : mod};
 
-  unsigned long long root[64] = {};
-  unsigned long long iroot[64] = {};
-  unsigned long long rate2[64] = {};
-  unsigned long long irate2[64] = {};
-  unsigned long long rate3[64] = {};
-  unsigned long long irate3[64] = {};
+  unsigned long long imag = 0;
+  unsigned long long iimag = 0;
+  unsigned long long step[13][64] = {};
+  unsigned long long istep[13][64] = {};
 
   constexpr NttInfo64() {
     if constexpr (!valid || mod == 2) return;
     unsigned long long g = internal_ntt64::ntt_primitive_root64((long long)mod);
     unsigned long long g_mont = mont.to_mont(g);
 
+    unsigned long long root[64] = {};
+    unsigned long long iroot[64] = {};
     root[rank2] = mont.pow(g_mont, (mod - 1ULL) >> rank2);
     iroot[rank2] = mont.pow(root[rank2], mod - 2ULL);
     for (int i = rank2 - 1; i >= 0; --i) {
@@ -1281,22 +1282,20 @@ template <long long m> struct NttInfo64 {
       iroot[i] = mont.mul(iroot[i + 1], iroot[i + 1]);
     }
 
-    unsigned long long prod = mont.one();
-    unsigned long long iprod = mont.one();
-    for (int i = 0; i <= rank2 - 2; ++i) {
-      rate2[i] = mont.mul(root[i + 2], prod);
-      irate2[i] = mont.mul(iroot[i + 2], iprod);
-      prod = mont.mul(prod, iroot[i + 2]);
-      iprod = mont.mul(iprod, root[i + 2]);
+    if (rank2 >= 2) {
+      imag = root[2];
+      iimag = iroot[2];
     }
 
-    prod = mont.one();
-    iprod = mont.one();
-    for (int i = 0; i <= rank2 - 3; ++i) {
-      rate3[i] = mont.mul(root[i + 3], prod);
-      irate3[i] = mont.mul(iroot[i + 3], iprod);
-      prod = mont.mul(prod, iroot[i + 3]);
-      iprod = mont.mul(iprod, root[i + 3]);
+    for (int d = 0; d < 13; ++d) {
+      unsigned long long prod = mont.one();
+      unsigned long long iprod = mont.one();
+      for (int k = 0; k + d <= rank2 - 2; ++k) {
+        step[d][k] = mont.mul(root[k + d + 2], prod);
+        istep[d][k] = mont.mul(iroot[k + d + 2], iprod);
+        prod = mont.mul(prod, iroot[k + d + 2]);
+        iprod = mont.mul(iprod, root[k + d + 2]);
+      }
     }
   }
 };
@@ -1305,108 +1304,330 @@ template <long long m> inline constexpr NttInfo64<m> ntt_info64{};
 
 namespace internal_ntt64 {
 
-template <long long m> void butterfly64(unsigned long long* a, int n) {
+inline unsigned long long add_lim64(unsigned long long a, unsigned long long b,
+                                    unsigned long long lim) {
+  unsigned long long s = a + b;
+  return s >= lim ? s - lim : s;
+}
+
+inline unsigned long long sub_lim64(unsigned long long a, unsigned long long b,
+                                    unsigned long long lim) {
+  return a >= b ? a - b : a + lim - b;
+}
+
+template <bool Lazy>
+inline unsigned long long mont_mul64(unsigned long long a, unsigned long long b,
+                                     const Montgomery64& mont) {
+  if constexpr (Lazy) return mont.mul_2m(a, b);
+  return mont.mul(a, b);
+}
+
+template <long long m, int FixedQ = 0>
+inline void radix4_stage64_fwd(unsigned long long* a, int n, int h,
+                               unsigned long long w1) {
   const auto& info = ntt_info64<m>;
-  const auto& mont = info.mont;
-  int h = std::countr_zero((unsigned int)n);
-  int len = 0;
-  while (len < h) {
-    if (h - len == 1) {
-      int p = 1 << (h - len - 1);
-      unsigned long long rot = mont.one();
-      for (int s = 0; s < (1 << len); ++s) {
-        int offset = s << (h - len);
-        for (int i = 0; i < p; ++i) {
-          unsigned long long l = a[i + offset];
-          unsigned long long r = mont.mul(a[i + offset + p], rot);
-          a[i + offset] = mont.add(l, r);
-          a[i + offset + p] = mont.sub(l, r);
-        }
-        if (s + 1 != (1 << len)) {
-          rot = mont.mul(rot, info.rate2[std::countr_one((unsigned int)s)]);
-        }
+  constexpr bool lazy = NttInfo64<m>::lazy;
+  constexpr unsigned long long lim =
+      lazy ? NttInfo64<m>::mod * 2ULL : NttInfo64<m>::mod;
+  if constexpr (FixedQ == 1) {
+    int blocks = n >> 2;
+    auto bfly4 = [&](unsigned long long* p, unsigned long long w1_s) {
+      unsigned long long w2_s = mont_mul64<lazy>(w1_s, w1_s, info.mont);
+      unsigned long long w3_s = mont_mul64<lazy>(w1_s, w2_s, info.mont);
+      unsigned long long a0 = p[0];
+      unsigned long long x1 = mont_mul64<lazy>(p[1], w1_s, info.mont);
+      unsigned long long x2 = mont_mul64<lazy>(p[2], w2_s, info.mont);
+      unsigned long long x3 = mont_mul64<lazy>(p[3], w3_s, info.mont);
+      unsigned long long u0 = add_lim64(a0, x2, lim);
+      unsigned long long u2 = sub_lim64(a0, x2, lim);
+      unsigned long long u1 = add_lim64(x1, x3, lim);
+      unsigned long long u3 =
+          mont_mul64<lazy>(x1 + lim - x3, info.imag, info.mont);
+      p[0] = add_lim64(u0, u1, lim);
+      p[1] = sub_lim64(u0, u1, lim);
+      p[2] = add_lim64(u2, u3, lim);
+      p[3] = sub_lim64(u2, u3, lim);
+    };
+    if (blocks == 1) {
+      bfly4(a, w1);
+      return;
+    }
+    unsigned long long w1_0 = w1;
+    unsigned long long w1_1 = mont_mul64<lazy>(w1, info.step[1][0], info.mont);
+    int u_end = blocks >> 1;
+    for (int u = 0; u < u_end; ++u) {
+      unsigned long long* p = a + (u << 3);
+      bfly4(p, w1_0);
+      bfly4(p + 4, w1_1);
+      if (u + 1 < u_end) {
+        unsigned long long st = info.step[2][std::countr_one((unsigned int)u)];
+        w1_0 = mont_mul64<lazy>(w1_0, st, info.mont);
+        w1_1 = mont_mul64<lazy>(w1_1, st, info.mont);
       }
-      ++len;
-    } else {
-      int p = 1 << (h - len - 2);
-      unsigned long long rot = mont.one();
-      unsigned long long imag = info.root[2];
-      for (int s = 0; s < (1 << len); ++s) {
-        unsigned long long rot2 = mont.mul(rot, rot);
-        unsigned long long rot3 = mont.mul(rot2, rot);
-        int offset = s << (h - len);
-        for (int i = 0; i < p; ++i) {
-          unsigned long long a0 = a[i + offset];
-          unsigned long long a1 = mont.mul(a[i + offset + p], rot);
-          unsigned long long a2 = mont.mul(a[i + offset + 2 * p], rot2);
-          unsigned long long a3 = mont.mul(a[i + offset + 3 * p], rot3);
-          unsigned long long a1na3imag = mont.mul(mont.sub(a1, a3), imag);
-          unsigned long long a0a2 = mont.add(a0, a2);
-          unsigned long long a0na2 = mont.sub(a0, a2);
-          unsigned long long a1a3 = mont.add(a1, a3);
-          a[i + offset] = mont.add(a0a2, a1a3);
-          a[i + offset + p] = mont.sub(a0a2, a1a3);
-          a[i + offset + 2 * p] = mont.add(a0na2, a1na3imag);
-          a[i + offset + 3 * p] = mont.sub(a0na2, a1na3imag);
-        }
-        if (s + 1 != (1 << len)) {
-          rot = mont.mul(rot, info.rate3[std::countr_one((unsigned int)s)]);
-        }
-      }
-      len += 2;
+    }
+    return;
+  }
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
+  for (int s = 0; s < blocks; ++s) {
+    unsigned long long w2 = mont_mul64<lazy>(w1, w1, info.mont);
+    unsigned long long w3 = mont_mul64<lazy>(w1, w2, info.mont);
+    unsigned long long* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
+    unsigned long long* p1 = p0 + q;
+    unsigned long long* p2 = p1 + q;
+    unsigned long long* p3 = p2 + q;
+    for (int i = 0; i < q; ++i) {
+      unsigned long long a0 = p0[i];
+      unsigned long long x1 = mont_mul64<lazy>(p1[i], w1, info.mont);
+      unsigned long long x2 = mont_mul64<lazy>(p2[i], w2, info.mont);
+      unsigned long long x3 = mont_mul64<lazy>(p3[i], w3, info.mont);
+
+      unsigned long long u0 = add_lim64(a0, x2, lim);
+      unsigned long long u2 = sub_lim64(a0, x2, lim);
+      unsigned long long u1 = add_lim64(x1, x3, lim);
+      unsigned long long u3 =
+          mont_mul64<lazy>(x1 + lim - x3, info.imag, info.mont);
+
+      p0[i] = add_lim64(u0, u1, lim);
+      p1[i] = sub_lim64(u0, u1, lim);
+      p2[i] = add_lim64(u2, u3, lim);
+      p3[i] = sub_lim64(u2, u3, lim);
+    }
+    if (s + 1 < blocks) {
+      w1 = mont_mul64<lazy>(w1, info.step[1][std::countr_one((unsigned int)s)],
+                            info.mont);
     }
   }
 }
 
-template <long long m> void butterfly_inv64(unsigned long long* a, int n) {
+template <long long m, int FixedQ = 0>
+inline void radix4_stage64_inv(unsigned long long* a, int n, int h,
+                               unsigned long long iw1) {
   const auto& info = ntt_info64<m>;
-  const auto& mont = info.mont;
-  int h = std::countr_zero((unsigned int)n);
-  int len = h;
-  while (len > 0) {
-    if (len == 1) {
-      --len;
-      int p = 1 << (h - len - 1);
-      unsigned long long irot = mont.one();
-      for (int s = 0; s < (1 << len); ++s) {
-        int offset = s << (h - len);
-        for (int i = 0; i < p; ++i) {
-          unsigned long long l = a[i + offset];
-          unsigned long long r = a[i + offset + p];
-          a[i + offset] = mont.add(l, r);
-          a[i + offset + p] = mont.mul(mont.sub(l, r), irot);
-        }
-        if (s + 1 != (1 << len)) {
-          irot = mont.mul(irot, info.irate2[std::countr_one((unsigned int)s)]);
-        }
+  constexpr bool lazy = NttInfo64<m>::lazy;
+  constexpr unsigned long long lim =
+      lazy ? NttInfo64<m>::mod * 2ULL : NttInfo64<m>::mod;
+  if constexpr (FixedQ == 1) {
+    int blocks = n >> 2;
+    auto bfly4_inv = [&](unsigned long long* p, unsigned long long iw1_s) {
+      unsigned long long iw2_s = mont_mul64<lazy>(iw1_s, iw1_s, info.mont);
+      unsigned long long iw3_s = mont_mul64<lazy>(iw1_s, iw2_s, info.mont);
+      unsigned long long c0 = p[0];
+      unsigned long long c1 = p[1];
+      unsigned long long c2 = p[2];
+      unsigned long long c3 = p[3];
+      unsigned long long u0 = add_lim64(c0, c1, lim);
+      unsigned long long u1 = sub_lim64(c0, c1, lim);
+      unsigned long long u2 = add_lim64(c2, c3, lim);
+      unsigned long long u3 =
+          mont_mul64<lazy>(c2 + lim - c3, info.iimag, info.mont);
+      p[0] = add_lim64(u0, u2, lim);
+      p[2] = mont_mul64<lazy>(u0 + lim - u2, iw2_s, info.mont);
+      p[1] = mont_mul64<lazy>(u1 + u3, iw1_s, info.mont);
+      p[3] = mont_mul64<lazy>(u1 + lim - u3, iw3_s, info.mont);
+    };
+    if (blocks == 1) {
+      bfly4_inv(a, iw1);
+      return;
+    }
+    unsigned long long iw1_0 = iw1;
+    unsigned long long iw1_1 =
+        mont_mul64<lazy>(iw1, info.istep[1][0], info.mont);
+    int u_end = blocks >> 1;
+    for (int u = 0; u < u_end; ++u) {
+      unsigned long long* p = a + (u << 3);
+      bfly4_inv(p, iw1_0);
+      bfly4_inv(p + 4, iw1_1);
+      if (u + 1 < u_end) {
+        unsigned long long st = info.istep[2][std::countr_one((unsigned int)u)];
+        iw1_0 = mont_mul64<lazy>(iw1_0, st, info.mont);
+        iw1_1 = mont_mul64<lazy>(iw1_1, st, info.mont);
       }
+    }
+    return;
+  }
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
+  for (int s = 0; s < blocks; ++s) {
+    unsigned long long iw2 = mont_mul64<lazy>(iw1, iw1, info.mont);
+    unsigned long long iw3 = mont_mul64<lazy>(iw1, iw2, info.mont);
+    unsigned long long* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
+    unsigned long long* p1 = p0 + q;
+    unsigned long long* p2 = p1 + q;
+    unsigned long long* p3 = p2 + q;
+    for (int i = 0; i < q; ++i) {
+      unsigned long long c0 = p0[i];
+      unsigned long long c1 = p1[i];
+      unsigned long long c2 = p2[i];
+      unsigned long long c3 = p3[i];
+
+      unsigned long long u0 = add_lim64(c0, c1, lim);
+      unsigned long long u1 = sub_lim64(c0, c1, lim);
+      unsigned long long u2 = add_lim64(c2, c3, lim);
+      unsigned long long u3 =
+          mont_mul64<lazy>(c2 + lim - c3, info.iimag, info.mont);
+
+      p0[i] = add_lim64(u0, u2, lim);
+      p2[i] = mont_mul64<lazy>(u0 + lim - u2, iw2, info.mont);
+      p1[i] = mont_mul64<lazy>(u1 + u3, iw1, info.mont);
+      p3[i] = mont_mul64<lazy>(u1 + lim - u3, iw3, info.mont);
+    }
+    if (s + 1 < blocks) {
+      iw1 = mont_mul64<lazy>(
+          iw1, info.istep[1][std::countr_one((unsigned int)s)], info.mont);
+    }
+  }
+}
+
+template <long long m, bool HalfZero = false>
+void butterfly64(unsigned long long* a, int n) {
+  const auto& info = ntt_info64<m>;
+  constexpr unsigned long long mod = NttInfo64<m>::mod;
+  constexpr bool lazy = NttInfo64<m>::lazy;
+  constexpr unsigned long long lim = lazy ? mod * 2ULL : mod;
+  int log_n = std::countr_zero((unsigned int)n);
+
+  int h = log_n;
+  if (h & 1) {
+    int p = n >> 1;
+    if constexpr (HalfZero) {
+      std::memcpy(a + p, a, sizeof(unsigned long long) * (unsigned int)p);
     } else {
-      len -= 2;
-      int p = 1 << (h - len - 2);
-      unsigned long long irot = mont.one();
-      unsigned long long iimag = info.iroot[2];
-      for (int s = 0; s < (1 << len); ++s) {
-        unsigned long long irot2 = mont.mul(irot, irot);
-        unsigned long long irot3 = mont.mul(irot2, irot);
-        int offset = s << (h - len);
-        for (int i = 0; i < p; ++i) {
-          unsigned long long a0 = a[i + offset];
-          unsigned long long a1 = a[i + offset + p];
-          unsigned long long a2 = a[i + offset + 2 * p];
-          unsigned long long a3 = a[i + offset + 3 * p];
-          unsigned long long a2na3iimag = mont.mul(mont.sub(a2, a3), iimag);
-          unsigned long long a0a1 = mont.add(a0, a1);
-          unsigned long long a0na1 = mont.sub(a0, a1);
-          unsigned long long a2a3 = mont.add(a2, a3);
-          a[i + offset] = mont.add(a0a1, a2a3);
-          a[i + offset + p] = mont.mul(mont.add(a0na1, a2na3iimag), irot);
-          a[i + offset + 2 * p] = mont.mul(mont.sub(a0a1, a2a3), irot2);
-          a[i + offset + 3 * p] = mont.mul(mont.sub(a0na1, a2na3iimag), irot3);
-        }
-        if (s + 1 != (1 << len)) {
-          irot = mont.mul(irot, info.irate3[std::countr_one((unsigned int)s)]);
-        }
+      for (int i = 0; i < p; ++i) {
+        unsigned long long x = a[i];
+        unsigned long long y = a[i + p];
+        a[i] = add_lim64(x, y, lim);
+        a[i + p] = sub_lim64(x, y, lim);
       }
+    }
+    --h;
+  } else if constexpr (HalfZero) {
+    if (n >= 4) {
+      int q = n >> 2;
+      unsigned long long* p0 = a;
+      unsigned long long* p1 = a + q;
+      unsigned long long* p2 = p1 + q;
+      unsigned long long* p3 = p2 + q;
+      for (int i = 0; i < q; ++i) {
+        unsigned long long a0 = p0[i];
+        unsigned long long a1 = p1[i];
+        unsigned long long u3 = mont_mul64<lazy>(a1, info.imag, info.mont);
+        p0[i] = add_lim64(a0, a1, lim);
+        p1[i] = sub_lim64(a0, a1, lim);
+        p2[i] = add_lim64(a0, u3, lim);
+        p3[i] = sub_lim64(a0, u3, lim);
+      }
+      h -= 2;
+    }
+  }
+
+  if (h <= 12) {
+    for (; h >= 6; h -= 2) radix4_stage64_fwd<m>(a, n, h, info.mont.one());
+    if (h >= 4) radix4_stage64_fwd<m, 4>(a, n, 4, info.mont.one());
+    if (h >= 2) radix4_stage64_fwd<m, 1>(a, n, 2, info.mont.one());
+    return;
+  }
+
+  for (; h > 12; h -= 2) radix4_stage64_fwd<m>(a, n, h, info.mont.one());
+
+  unsigned long long w_init[6] = {info.mont.one(), info.mont.one(),
+                                  info.mont.one(), info.mont.one(),
+                                  info.mont.one(), info.mont.one()};
+  int s_end = n >> 12;
+  for (int s = 0; s < s_end; ++s) {
+    unsigned long long* blk = a + (s << 12);
+    radix4_stage64_fwd<m>(blk, 1 << 12, 12, w_init[0]);
+    radix4_stage64_fwd<m>(blk, 1 << 12, 10, w_init[1]);
+    radix4_stage64_fwd<m>(blk, 1 << 12, 8, w_init[2]);
+    radix4_stage64_fwd<m>(blk, 1 << 12, 6, w_init[3]);
+    radix4_stage64_fwd<m, 4>(blk, 1 << 12, 4, w_init[4]);
+    radix4_stage64_fwd<m, 1>(blk, 1 << 12, 2, w_init[5]);
+    if (s + 1 < s_end) {
+      int k = std::countr_one((unsigned int)s);
+      w_init[0] = mont_mul64<lazy>(w_init[0], info.step[1][k], info.mont);
+      w_init[1] = mont_mul64<lazy>(w_init[1], info.step[3][k], info.mont);
+      w_init[2] = mont_mul64<lazy>(w_init[2], info.step[5][k], info.mont);
+      w_init[3] = mont_mul64<lazy>(w_init[3], info.step[7][k], info.mont);
+      w_init[4] = mont_mul64<lazy>(w_init[4], info.step[9][k], info.mont);
+      w_init[5] = mont_mul64<lazy>(w_init[5], info.step[11][k], info.mont);
+    }
+  }
+}
+
+template <long long m, bool SameInput>
+inline void pointwise_mul64(unsigned long long* a, const unsigned long long* b,
+                            int n) {
+  for (int i = 0; i < n; ++i) {
+    unsigned long long rhs = SameInput ? a[i] : b[i];
+    a[i] = mont_mul64<NttInfo64<m>::lazy>(a[i], rhs, ntt_info64<m>.mont);
+  }
+}
+
+template <long long m, bool SameInput>
+void butterfly_inv64(unsigned long long* a, const unsigned long long* b,
+                     int n) {
+  const auto& info = ntt_info64<m>;
+  constexpr unsigned long long mod = NttInfo64<m>::mod;
+  constexpr bool lazy = NttInfo64<m>::lazy;
+  constexpr unsigned long long lim = lazy ? mod * 2ULL : mod;
+  int log_n = std::countr_zero((unsigned int)n);
+
+  int h = 2;
+  if (log_n <= 12) {
+    pointwise_mul64<m, SameInput>(a, b, n);
+    if (2 <= log_n) radix4_stage64_inv<m, 1>(a, n, 2, info.mont.one());
+    if (4 <= log_n) radix4_stage64_inv<m, 4>(a, n, 4, info.mont.one());
+    for (h = 6; h <= log_n; h += 2) {
+      radix4_stage64_inv<m>(a, n, h, info.mont.one());
+    }
+    if ((log_n & 1) != 0) {
+      int p = n >> 1;
+      for (int i = 0; i < p; ++i) {
+        unsigned long long x = a[i];
+        unsigned long long y = a[i + p];
+        a[i] = add_lim64(x, y, lim);
+        a[i + p] = sub_lim64(x, y, lim);
+      }
+    }
+    return;
+  }
+
+  unsigned long long iw_init[6] = {info.mont.one(), info.mont.one(),
+                                   info.mont.one(), info.mont.one(),
+                                   info.mont.one(), info.mont.one()};
+  int s_end = n >> 12;
+  for (int s = 0; s < s_end; ++s) {
+    int blk_off = s << 12;
+    unsigned long long* blk = a + blk_off;
+    pointwise_mul64<m, SameInput>(blk, SameInput ? nullptr : b + blk_off,
+                                  1 << 12);
+    radix4_stage64_inv<m, 1>(blk, 1 << 12, 2, iw_init[5]);
+    radix4_stage64_inv<m, 4>(blk, 1 << 12, 4, iw_init[4]);
+    radix4_stage64_inv<m>(blk, 1 << 12, 6, iw_init[3]);
+    radix4_stage64_inv<m>(blk, 1 << 12, 8, iw_init[2]);
+    radix4_stage64_inv<m>(blk, 1 << 12, 10, iw_init[1]);
+    radix4_stage64_inv<m>(blk, 1 << 12, 12, iw_init[0]);
+    if (s + 1 < s_end) {
+      int k = std::countr_one((unsigned int)s);
+      iw_init[0] = mont_mul64<lazy>(iw_init[0], info.istep[1][k], info.mont);
+      iw_init[1] = mont_mul64<lazy>(iw_init[1], info.istep[3][k], info.mont);
+      iw_init[2] = mont_mul64<lazy>(iw_init[2], info.istep[5][k], info.mont);
+      iw_init[3] = mont_mul64<lazy>(iw_init[3], info.istep[7][k], info.mont);
+      iw_init[4] = mont_mul64<lazy>(iw_init[4], info.istep[9][k], info.mont);
+      iw_init[5] = mont_mul64<lazy>(iw_init[5], info.istep[11][k], info.mont);
+    }
+  }
+
+  for (h = 14; h <= log_n; h += 2) {
+    radix4_stage64_inv<m>(a, n, h, info.mont.one());
+  }
+  if (log_n & 1) {
+    int p = n >> 1;
+    for (int i = 0; i < p; ++i) {
+      unsigned long long x = a[i];
+      unsigned long long y = a[i + p];
+      a[i] = add_lim64(x, y, lim);
+      a[i + p] = sub_lim64(x, y, lim);
     }
   }
 }
@@ -1415,21 +1636,33 @@ template <long long m> void butterfly_inv64(unsigned long long* a, int n) {
 
 template <long long m>
 void ntt_forward_prepared64(unsigned long long* dst, int n, int z) {
-  if (n < z) {
-    std::memset(dst + n, 0, sizeof(unsigned long long) * (unsigned int)(z - n));
+  int half = z >> 1;
+  if (z >= 4 && n <= half) {
+    if (n < half) {
+      std::memset(dst + n, 0,
+                  sizeof(unsigned long long) * (unsigned int)(half - n));
+    }
+    internal_ntt64::butterfly64<m, true>(dst, z);
+  } else {
+    if (n < z) {
+      std::memset(dst + n, 0,
+                  sizeof(unsigned long long) * (unsigned int)(z - n));
+    }
+    internal_ntt64::butterfly64<m, false>(dst, z);
   }
-  internal_ntt64::butterfly64<m>(dst, z);
 }
 
 template <long long m>
 unsigned long long finish_ntt_convolution64(unsigned long long* a,
                                             const unsigned long long* b, int z,
                                             bool same_input) {
+  if (same_input) {
+    internal_ntt64::butterfly_inv64<m, true>(a, nullptr, z);
+  } else {
+    internal_ntt64::butterfly_inv64<m, false>(a, b, z);
+  }
   const auto& info = ntt_info64<m>;
   const auto& mont = info.mont;
-  const unsigned long long* pb = same_input ? a : b;
-  for (int i = 0; i < z; ++i) a[i] = mont.mul(a[i], pb[i]);
-  internal_ntt64::butterfly_inv64<m>(a, z);
   unsigned long long iz_mont =
       mont.pow(mont.to_mont((unsigned long long)z % info.mod), info.mod - 2ULL);
   return mont.mul(iz_mont, mont.r2());
