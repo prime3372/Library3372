@@ -1,6 +1,6 @@
 # 静的 modint
 
-固定の法 $m$ による剰余環 $\mathbb{Z}/m\mathbb{Z}$ の元を表すクラスです。環演算や比較を $O(1)$ で、べき乗や逆元の計算を対数時間で行えます。
+コンパイル時定数の法 $m$ による剰余環 $\mathbb{Z}/m\mathbb{Z}$ の元を表すクラスです。環演算や比較を $O(1)$ で、べき乗や逆元の計算を $O(\log m)$ で行えます。
 
 ## テンプレート引数
 
@@ -29,7 +29,7 @@ StaticModInt::StaticModInt(T v);  // (2)
 
 ### 制約
 
-- (2): $T$ は整数型
+- (2): `T` は整数型
 
 ### 計算量
 
@@ -58,7 +58,7 @@ static StaticModInt StaticModInt::raw(T v);
 
 ### 制約
 
-- $T$ は整数型
+- `T` は整数型
 - $0 \leq v < m$
 
 ### 計算量
@@ -154,7 +154,7 @@ StaticModInt& StaticModInt::operator+=(T rhs);  // (2)
 
 ### 制約
 
-- (2): $T$ は整数型
+- (2): `T` は整数型
 
 ### 計算量
 
@@ -173,7 +173,7 @@ StaticModInt& StaticModInt::operator-=(T rhs);  // (2)
 
 ### 制約
 
-- (2): $T$ は整数型
+- (2): `T` は整数型
 
 ### 計算量
 
@@ -192,7 +192,7 @@ StaticModInt& StaticModInt::operator*=(T rhs);  // (2)
 
 ### 制約
 
-- (2): $T$ は整数型
+- (2): `T` は整数型
 
 ### 計算量
 
@@ -212,7 +212,7 @@ StaticModInt& StaticModInt::operator/=(T rhs);  // (2)
 ### 制約
 
 - (1): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
-- (2): $T$ は整数型
+- (2): `T` は整数型
 - (2): $\gcd(\mathrm{StaticModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
 
 ### 計算量
@@ -238,7 +238,7 @@ StaticModInt operator+(T lhs, StaticModInt rhs);  // (4)
 
 ### 制約
 
-- (3), (4): $T$ は整数型
+- (3), (4): `T` は整数型
 
 ### 計算量
 
@@ -263,7 +263,7 @@ StaticModInt operator-(T lhs, StaticModInt rhs);  // (4)
 
 ### 制約
 
-- (3), (4): $T$ は整数型
+- (3), (4): `T` は整数型
 
 ### 計算量
 
@@ -285,7 +285,7 @@ StaticModInt operator*(T lhs, StaticModInt rhs);  // (3)
 
 ### 制約
 
-- (2), (3): $T$ は整数型
+- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -309,7 +309,7 @@ StaticModInt operator/(T lhs, StaticModInt rhs);  // (3)
 
 - (1), (3): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
 - (2): $\gcd(\mathrm{StaticModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
-- (2), (3): $T$ は整数型
+- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -331,7 +331,7 @@ bool operator==(T lhs, StaticModInt rhs);  // (3)
 
 ### 制約
 
-- (2), (3): $T$ は整数型
+- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -353,7 +353,7 @@ bool operator!=(T lhs, StaticModInt rhs);  // (3)
 
 ### 制約
 
-- (2), (3): $T$ は整数型
+- (2), (3): `T` は整数型
 
 ### 計算量
 
