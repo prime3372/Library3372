@@ -1,6 +1,6 @@
 # Convolution (long long)
 
-長さが $n$ と $m$ の 64 bit 整数列に対し、畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+64 bit 整数列に対する畳み込みの結果を $O(n \log n)$ で求めます。
 
 ## convolution_ll
 
@@ -9,7 +9,7 @@ std::vector<long long> convolution_ll(const std::vector<long long>& a,
                                       const std::vector<long long>& b);
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \sum_{i + j = k} a_i b_j$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 $a, b$ に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \sum_{i + j = k} a_i b_j$ として計算します。$a$ または $b$ が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
