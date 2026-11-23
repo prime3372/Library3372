@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <bit>
 #include <cassert>
+#include <cstring>
+#include <new>
 #include <utility>
 #include <vector>
 
@@ -130,12 +132,12 @@ template <int m> struct NttInfo {
   unsigned int iimag = 0;
   unsigned int step[13][32] = {};
   unsigned int istep[13][32] = {};
-  unsigned int w4_init[8] = {};
-  unsigned int w2_init[8] = {};
-  unsigned int w1_init[8] = {};
-  unsigned int iw4_init[8] = {};
-  unsigned int iw2_init[8] = {};
-  unsigned int iw1_init[8] = {};
+  alignas(32) unsigned int w4_init[8] = {};
+  alignas(32) unsigned int w2_init[8] = {};
+  alignas(32) unsigned int w1_init[8] = {};
+  alignas(32) unsigned int iw4_init[8] = {};
+  alignas(32) unsigned int iw2_init[8] = {};
+  alignas(32) unsigned int iw1_init[8] = {};
 
   constexpr NttInfo() {
     if constexpr (!valid || mod == 2) return;
@@ -231,6 +233,54 @@ template <int m> struct NttInfo {
 
 template <int m> inline constexpr NttInfo<m> ntt_info{};
 
+struct AlignedBuffer {
+  unsigned int* data = nullptr;
+
+  AlignedBuffer() = default;
+  explicit AlignedBuffer(int n)
+      : data(n > 0 ? new (std::align_val_t(32)) unsigned int[n] : nullptr) {}
+
+  ~AlignedBuffer() {
+    if (data != nullptr) ::operator delete[](data, std::align_val_t(32));
+  }
+
+  AlignedBuffer(const AlignedBuffer&) = delete;
+  AlignedBuffer& operator=(const AlignedBuffer&) = delete;
+
+  AlignedBuffer(AlignedBuffer&& other) noexcept : data(other.data) {
+    other.data = nullptr;
+  }
+
+  AlignedBuffer& operator=(AlignedBuffer&& other) noexcept {
+    if (this != &other) {
+      if (data != nullptr) ::operator delete[](data, std::align_val_t(32));
+      data = other.data;
+      other.data = nullptr;
+    }
+    return *this;
+  }
+};
+
+template <bool Lazy>
+inline unsigned int add_lim_scalar(unsigned int a, unsigned int b,
+                                   unsigned int lim) {
+  unsigned int s = a + b;
+  return s >= lim ? s - lim : s;
+}
+
+template <bool Lazy>
+inline unsigned int sub_lim_scalar(unsigned int a, unsigned int b,
+                                   unsigned int lim) {
+  return a >= b ? a - b : a + lim - b;
+}
+
+template <bool Lazy>
+inline unsigned int mont_mul_scalar(unsigned int a, unsigned int b,
+                                    const Montgomery32& mont) {
+  if constexpr (Lazy) return mont.mul_2m(a, b);
+  return mont.mul(a, b);
+}
+
 #ifdef __AVX2__
 
 struct Avx2MontConsts {
@@ -295,28 +345,28 @@ inline __m256i mont_mul_bcast_avx2(__m256i a, __m256i b_bcast,
   return u;
 }
 
-template <int m>
+template <int m, int FixedQ = 0>
 inline void radix4_stage_fwd(unsigned int* a, int n, int h, unsigned int w1,
                              const Avx2MontConsts& c, __m256i vimag) {
   const auto& info = ntt_info<m>;
   constexpr bool lazy = NttInfo<m>::lazy;
-  int q = 1 << (h - 2);
-  int blocks = n >> h;
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
   for (int s = 0; s < blocks; ++s) {
-    unsigned int w2 = info.mont.mul(w1, w1);
-    unsigned int w3 = info.mont.mul(w1, w2);
+    unsigned int w2 = mont_mul_scalar<lazy>(w1, w1, info.mont);
+    unsigned int w3 = mont_mul_scalar<lazy>(w1, w2, info.mont);
     __m256i vw1 = _mm256_set1_epi32((int)w1);
     __m256i vw2 = _mm256_set1_epi32((int)w2);
     __m256i vw3 = _mm256_set1_epi32((int)w3);
-    unsigned int* p0 = a + (s << h);
+    unsigned int* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
     unsigned int* p1 = p0 + q;
     unsigned int* p2 = p1 + q;
     unsigned int* p3 = p2 + q;
     for (int i = 0; i < q; i += 8) {
-      __m256i a0 = _mm256_loadu_si256((const __m256i*)(p0 + i));
-      __m256i a1 = _mm256_loadu_si256((const __m256i*)(p1 + i));
-      __m256i a2 = _mm256_loadu_si256((const __m256i*)(p2 + i));
-      __m256i a3 = _mm256_loadu_si256((const __m256i*)(p3 + i));
+      __m256i a0 = _mm256_load_si256((const __m256i*)(p0 + i));
+      __m256i a1 = _mm256_load_si256((const __m256i*)(p1 + i));
+      __m256i a2 = _mm256_load_si256((const __m256i*)(p2 + i));
+      __m256i a3 = _mm256_load_si256((const __m256i*)(p3 + i));
 
       __m256i x1 = mont_mul_bcast_avx2<lazy>(a1, vw1, c);
       __m256i x2 = mont_mul_bcast_avx2<lazy>(a2, vw2, c);
@@ -328,93 +378,115 @@ inline void radix4_stage_fwd(unsigned int* a, int n, int h, unsigned int w1,
       __m256i diff13 = _mm256_sub_epi32(_mm256_add_epi32(x1, c.lim), x3);
       __m256i u3 = mont_mul_bcast_avx2<lazy>(diff13, vimag, c);
 
-      _mm256_storeu_si256((__m256i*)(p0 + i), add_lim_avx2(u0, u1, c.lim));
-      _mm256_storeu_si256((__m256i*)(p1 + i), sub_lim_avx2(u0, u1, c.lim));
-      _mm256_storeu_si256((__m256i*)(p2 + i), add_lim_avx2(u2, u3, c.lim));
-      _mm256_storeu_si256((__m256i*)(p3 + i), sub_lim_avx2(u2, u3, c.lim));
+      _mm256_store_si256((__m256i*)(p0 + i), add_lim_avx2(u0, u1, c.lim));
+      _mm256_store_si256((__m256i*)(p1 + i), sub_lim_avx2(u0, u1, c.lim));
+      _mm256_store_si256((__m256i*)(p2 + i), add_lim_avx2(u2, u3, c.lim));
+      _mm256_store_si256((__m256i*)(p3 + i), sub_lim_avx2(u2, u3, c.lim));
     }
     if (s + 1 < blocks) {
-      w1 = info.mont.mul(w1, info.step[1][std::countr_one((unsigned int)s)]);
+      w1 = mont_mul_scalar<lazy>(
+          w1, info.step[1][std::countr_one((unsigned int)s)], info.mont);
     }
   }
 }
 
 template <int m>
-inline void last3_fwd(unsigned int* a, int t_end, __m256i w4, __m256i w2,
-                      __m256i w1, const Avx2MontConsts& c) {
+inline void last3_fwd_pair(unsigned int* ptr, __m256i w4, __m256i w2,
+                           __m256i w1, const Avx2MontConsts& c) {
+  constexpr bool lazy = NttInfo<m>::lazy;
+  __m256i v0 = _mm256_load_si256((const __m256i*)ptr);
+  __m256i v1 = _mm256_load_si256((const __m256i*)(ptr + 8));
+
+  __m256i lo = _mm256_permute2x128_si256(v0, v1, 0x20);
+  __m256i hi = _mm256_permute2x128_si256(v0, v1, 0x31);
+
+  __m256i r4 = mont_mul_avx2<lazy>(hi, w4, c);
+  __m256i a4 = add_lim_avx2(lo, r4, c.lim);
+  __m256i b4 = sub_lim_avx2(lo, r4, c.lim);
+
+  __m256i x0 = _mm256_unpacklo_epi64(a4, b4);
+  __m256i x1 = _mm256_unpackhi_epi64(a4, b4);
+
+  __m256i r2 = mont_mul_avx2<lazy>(x1, w2, c);
+  __m256i a2 = add_lim_avx2(x0, r2, c.lim);
+  __m256i b2 = sub_lim_avx2(x0, r2, c.lim);
+
+  __m256i y0 = _mm256_castps_si256(_mm256_shuffle_ps(
+      _mm256_castsi256_ps(a2), _mm256_castsi256_ps(b2), 0x88));
+  __m256i y1 = _mm256_castps_si256(_mm256_shuffle_ps(
+      _mm256_castsi256_ps(a2), _mm256_castsi256_ps(b2), 0xDD));
+
+  __m256i r1 = mont_mul_avx2<lazy>(y1, w1, c);
+  __m256i a1 = add_lim_avx2(y0, r1, c.lim);
+  __m256i b1 = sub_lim_avx2(y0, r1, c.lim);
+
+  __m256i z0 = _mm256_unpacklo_epi32(a1, b1);
+  __m256i z1 = _mm256_unpackhi_epi32(a1, b1);
+  __m256i lo_out = _mm256_unpacklo_epi64(z0, z1);
+  __m256i hi_out = _mm256_unpackhi_epi64(z0, z1);
+  _mm256_store_si256((__m256i*)ptr,
+                     _mm256_permute2x128_si256(lo_out, hi_out, 0x20));
+  _mm256_store_si256((__m256i*)(ptr + 8),
+                     _mm256_permute2x128_si256(lo_out, hi_out, 0x31));
+}
+
+template <int m>
+inline void last3_fwd(unsigned int* a, int t_end, __m256i w4_0, __m256i w2_0,
+                      __m256i w1_0, const Avx2MontConsts& c) {
+  if (t_end == 1) {
+    last3_fwd_pair<m>(a, w4_0, w2_0, w1_0, c);
+    return;
+  }
   const auto& info = ntt_info<m>;
   constexpr bool lazy = NttInfo<m>::lazy;
-  for (int t = 0; t < t_end; ++t) {
-    unsigned int* ptr = a + (t << 4);
-    __m256i v0 = _mm256_loadu_si256((const __m256i*)ptr);
-    __m256i v1 = _mm256_loadu_si256((const __m256i*)(ptr + 8));
-
-    __m256i lo = _mm256_permute2x128_si256(v0, v1, 0x20);
-    __m256i hi = _mm256_permute2x128_si256(v0, v1, 0x31);
-
-    __m256i r4 = mont_mul_avx2<lazy>(hi, w4, c);
-    __m256i a4 = add_lim_avx2(lo, r4, c.lim);
-    __m256i b4 = sub_lim_avx2(lo, r4, c.lim);
-
-    __m256i x0 = _mm256_unpacklo_epi64(a4, b4);
-    __m256i x1 = _mm256_unpackhi_epi64(a4, b4);
-
-    __m256i r2 = mont_mul_avx2<lazy>(x1, w2, c);
-    __m256i a2 = add_lim_avx2(x0, r2, c.lim);
-    __m256i b2 = sub_lim_avx2(x0, r2, c.lim);
-
-    __m256i y0 = _mm256_castps_si256(_mm256_shuffle_ps(
-        _mm256_castsi256_ps(a2), _mm256_castsi256_ps(b2), 0x88));
-    __m256i y1 = _mm256_castps_si256(_mm256_shuffle_ps(
-        _mm256_castsi256_ps(a2), _mm256_castsi256_ps(b2), 0xDD));
-
-    __m256i r1 = mont_mul_avx2<lazy>(y1, w1, c);
-    __m256i a1 = add_lim_avx2(y0, r1, c.lim);
-    __m256i b1 = sub_lim_avx2(y0, r1, c.lim);
-
-    __m256i z0 = _mm256_unpacklo_epi32(a1, b1);
-    __m256i z1 = _mm256_unpackhi_epi32(a1, b1);
-    __m256i lo_out = _mm256_unpacklo_epi64(z0, z1);
-    __m256i hi_out = _mm256_unpackhi_epi64(z0, z1);
-    _mm256_storeu_si256((__m256i*)ptr,
-                        _mm256_permute2x128_si256(lo_out, hi_out, 0x20));
-    _mm256_storeu_si256((__m256i*)(ptr + 8),
-                        _mm256_permute2x128_si256(lo_out, hi_out, 0x31));
-
-    if (t + 1 < t_end) {
-      int k = std::countr_one((unsigned int)t);
-      w4 = mont_mul_bcast_avx2<lazy>(
-          w4, _mm256_set1_epi32((int)info.step[1][k]), c);
-      w2 = mont_mul_bcast_avx2<lazy>(
-          w2, _mm256_set1_epi32((int)info.step[2][k]), c);
-      w1 = mont_mul_bcast_avx2<lazy>(
-          w1, _mm256_set1_epi32((int)info.step[3][k]), c);
+  __m256i w4_1 = mont_mul_bcast_avx2<lazy>(
+      w4_0, _mm256_set1_epi32((int)info.step[1][0]), c);
+  __m256i w2_1 = mont_mul_bcast_avx2<lazy>(
+      w2_0, _mm256_set1_epi32((int)info.step[2][0]), c);
+  __m256i w1_1 = mont_mul_bcast_avx2<lazy>(
+      w1_0, _mm256_set1_epi32((int)info.step[3][0]), c);
+  int u_end = t_end >> 1;
+  for (int u = 0; u < u_end; ++u) {
+    unsigned int* ptr = a + (u << 5);
+    last3_fwd_pair<m>(ptr, w4_0, w2_0, w1_0, c);
+    last3_fwd_pair<m>(ptr + 16, w4_1, w2_1, w1_1, c);
+    if (u + 1 < u_end) {
+      int k = std::countr_one((unsigned int)u);
+      __m256i s4 = _mm256_set1_epi32((int)info.step[2][k]);
+      __m256i s2 = _mm256_set1_epi32((int)info.step[3][k]);
+      __m256i s1 = _mm256_set1_epi32((int)info.step[4][k]);
+      w4_0 = mont_mul_bcast_avx2<lazy>(w4_0, s4, c);
+      w4_1 = mont_mul_bcast_avx2<lazy>(w4_1, s4, c);
+      w2_0 = mont_mul_bcast_avx2<lazy>(w2_0, s2, c);
+      w2_1 = mont_mul_bcast_avx2<lazy>(w2_1, s2, c);
+      w1_0 = mont_mul_bcast_avx2<lazy>(w1_0, s1, c);
+      w1_1 = mont_mul_bcast_avx2<lazy>(w1_1, s1, c);
     }
   }
 }
 
-template <int m>
+template <int m, int FixedQ = 0>
 inline void radix4_stage_inv(unsigned int* a, int n, int h, unsigned int iw1_s,
                              const Avx2MontConsts& c, __m256i viimag) {
   const auto& info = ntt_info<m>;
   constexpr bool lazy = NttInfo<m>::lazy;
-  int q = 1 << (h - 2);
-  int blocks = n >> h;
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
   for (int s = 0; s < blocks; ++s) {
-    unsigned int iw2_s = info.mont.mul(iw1_s, iw1_s);
-    unsigned int iw3_s = info.mont.mul(iw1_s, iw2_s);
+    unsigned int iw2_s = mont_mul_scalar<lazy>(iw1_s, iw1_s, info.mont);
+    unsigned int iw3_s = mont_mul_scalar<lazy>(iw1_s, iw2_s, info.mont);
     __m256i vw1 = _mm256_set1_epi32((int)iw1_s);
     __m256i vw2 = _mm256_set1_epi32((int)iw2_s);
     __m256i vw3 = _mm256_set1_epi32((int)iw3_s);
-    unsigned int* p0 = a + (s << h);
+    unsigned int* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
     unsigned int* p1 = p0 + q;
     unsigned int* p2 = p1 + q;
     unsigned int* p3 = p2 + q;
     for (int i = 0; i < q; i += 8) {
-      __m256i c0 = _mm256_loadu_si256((const __m256i*)(p0 + i));
-      __m256i c1 = _mm256_loadu_si256((const __m256i*)(p1 + i));
-      __m256i c2 = _mm256_loadu_si256((const __m256i*)(p2 + i));
-      __m256i c3 = _mm256_loadu_si256((const __m256i*)(p3 + i));
+      __m256i c0 = _mm256_load_si256((const __m256i*)(p0 + i));
+      __m256i c1 = _mm256_load_si256((const __m256i*)(p1 + i));
+      __m256i c2 = _mm256_load_si256((const __m256i*)(p2 + i));
+      __m256i c3 = _mm256_load_si256((const __m256i*)(p3 + i));
 
       __m256i u0 = add_lim_avx2(c0, c1, c.lim);
       __m256i u1 = sub_lim_avx2(c0, c1, c.lim);
@@ -429,72 +501,93 @@ inline void radix4_stage_inv(unsigned int* a, int n, int h, unsigned int iw1_s,
       __m256i d13 = _mm256_sub_epi32(_mm256_add_epi32(u1, c.lim), u3);
       __m256i x3 = mont_mul_bcast_avx2<lazy>(d13, vw3, c);
 
-      _mm256_storeu_si256((__m256i*)(p0 + i), x0);
-      _mm256_storeu_si256((__m256i*)(p1 + i), x1);
-      _mm256_storeu_si256((__m256i*)(p2 + i), x2);
-      _mm256_storeu_si256((__m256i*)(p3 + i), x3);
+      _mm256_store_si256((__m256i*)(p0 + i), x0);
+      _mm256_store_si256((__m256i*)(p1 + i), x1);
+      _mm256_store_si256((__m256i*)(p2 + i), x2);
+      _mm256_store_si256((__m256i*)(p3 + i), x3);
     }
     if (s + 1 < blocks) {
-      iw1_s =
-          info.mont.mul(iw1_s, info.istep[1][std::countr_one((unsigned int)s)]);
+      iw1_s = mont_mul_scalar<lazy>(
+          iw1_s, info.istep[1][std::countr_one((unsigned int)s)], info.mont);
     }
   }
 }
 
 template <int m>
-inline void last3_inv(unsigned int* a, int t_end, __m256i iw4, __m256i iw2,
-                      __m256i iw1, const Avx2MontConsts& c) {
+inline void last3_inv_pair(unsigned int* ptr, __m256i iw4, __m256i iw2,
+                           __m256i iw1, const Avx2MontConsts& c) {
+  constexpr bool lazy = NttInfo<m>::lazy;
+  __m256i v0 = _mm256_load_si256((const __m256i*)ptr);
+  __m256i v1 = _mm256_load_si256((const __m256i*)(ptr + 8));
+
+  __m256i lo = _mm256_permute2x128_si256(v0, v1, 0x20);
+  __m256i hi = _mm256_permute2x128_si256(v0, v1, 0x31);
+  __m256i x0 = _mm256_unpacklo_epi64(lo, hi);
+  __m256i x1 = _mm256_unpackhi_epi64(lo, hi);
+  __m256i y0 = _mm256_castps_si256(_mm256_shuffle_ps(
+      _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0x88));
+  __m256i y1 = _mm256_castps_si256(_mm256_shuffle_ps(
+      _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0xDD));
+
+  __m256i a1 = add_lim_avx2(y0, y1, c.lim);
+  __m256i d1 = _mm256_sub_epi32(_mm256_add_epi32(y0, c.lim), y1);
+  __m256i b1 = mont_mul_avx2<lazy>(d1, iw1, c);
+
+  __m256i z0 = _mm256_unpacklo_epi32(a1, b1);
+  __m256i z1 = _mm256_unpackhi_epi32(a1, b1);
+
+  __m256i a2 = add_lim_avx2(z0, z1, c.lim);
+  __m256i d2 = _mm256_sub_epi32(_mm256_add_epi32(z0, c.lim), z1);
+  __m256i b2 = mont_mul_avx2<lazy>(d2, iw2, c);
+
+  __m256i lo4 = _mm256_unpacklo_epi64(a2, b2);
+  __m256i hi4 = _mm256_unpackhi_epi64(a2, b2);
+
+  __m256i a4 = add_lim_avx2(lo4, hi4, c.lim);
+  __m256i d4 = _mm256_sub_epi32(_mm256_add_epi32(lo4, c.lim), hi4);
+  __m256i b4 = mont_mul_avx2<lazy>(d4, iw4, c);
+
+  _mm256_store_si256((__m256i*)ptr, _mm256_permute2x128_si256(a4, b4, 0x20));
+  _mm256_store_si256((__m256i*)(ptr + 8),
+                     _mm256_permute2x128_si256(a4, b4, 0x31));
+}
+
+template <int m>
+inline void last3_inv(unsigned int* a, int t_end, __m256i iw4_0, __m256i iw2_0,
+                      __m256i iw1_0, const Avx2MontConsts& c) {
+  if (t_end == 1) {
+    last3_inv_pair<m>(a, iw4_0, iw2_0, iw1_0, c);
+    return;
+  }
   const auto& info = ntt_info<m>;
   constexpr bool lazy = NttInfo<m>::lazy;
-  for (int t = 0; t < t_end; ++t) {
-    unsigned int* ptr = a + (t << 4);
-    __m256i v0 = _mm256_loadu_si256((const __m256i*)ptr);
-    __m256i v1 = _mm256_loadu_si256((const __m256i*)(ptr + 8));
-
-    __m256i lo = _mm256_permute2x128_si256(v0, v1, 0x20);
-    __m256i hi = _mm256_permute2x128_si256(v0, v1, 0x31);
-    __m256i x0 = _mm256_unpacklo_epi64(lo, hi);
-    __m256i x1 = _mm256_unpackhi_epi64(lo, hi);
-    __m256i y0 = _mm256_castps_si256(_mm256_shuffle_ps(
-        _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0x88));
-    __m256i y1 = _mm256_castps_si256(_mm256_shuffle_ps(
-        _mm256_castsi256_ps(x0), _mm256_castsi256_ps(x1), 0xDD));
-
-    __m256i a1 = add_lim_avx2(y0, y1, c.lim);
-    __m256i d1 = _mm256_sub_epi32(_mm256_add_epi32(y0, c.lim), y1);
-    __m256i b1 = mont_mul_avx2<lazy>(d1, iw1, c);
-
-    __m256i z0 = _mm256_unpacklo_epi32(a1, b1);
-    __m256i z1 = _mm256_unpackhi_epi32(a1, b1);
-
-    __m256i a2 = add_lim_avx2(z0, z1, c.lim);
-    __m256i d2 = _mm256_sub_epi32(_mm256_add_epi32(z0, c.lim), z1);
-    __m256i b2 = mont_mul_avx2<lazy>(d2, iw2, c);
-
-    __m256i lo4 = _mm256_unpacklo_epi64(a2, b2);
-    __m256i hi4 = _mm256_unpackhi_epi64(a2, b2);
-
-    __m256i a4 = add_lim_avx2(lo4, hi4, c.lim);
-    __m256i d4 = _mm256_sub_epi32(_mm256_add_epi32(lo4, c.lim), hi4);
-    __m256i b4 = mont_mul_avx2<lazy>(d4, iw4, c);
-
-    _mm256_storeu_si256((__m256i*)ptr, _mm256_permute2x128_si256(a4, b4, 0x20));
-    _mm256_storeu_si256((__m256i*)(ptr + 8),
-                        _mm256_permute2x128_si256(a4, b4, 0x31));
-
-    if (t + 1 < t_end) {
-      int k = std::countr_one((unsigned int)t);
-      iw4 = mont_mul_bcast_avx2<lazy>(
-          iw4, _mm256_set1_epi32((int)info.istep[1][k]), c);
-      iw2 = mont_mul_bcast_avx2<lazy>(
-          iw2, _mm256_set1_epi32((int)info.istep[2][k]), c);
-      iw1 = mont_mul_bcast_avx2<lazy>(
-          iw1, _mm256_set1_epi32((int)info.istep[3][k]), c);
+  __m256i iw4_1 = mont_mul_bcast_avx2<lazy>(
+      iw4_0, _mm256_set1_epi32((int)info.istep[1][0]), c);
+  __m256i iw2_1 = mont_mul_bcast_avx2<lazy>(
+      iw2_0, _mm256_set1_epi32((int)info.istep[2][0]), c);
+  __m256i iw1_1 = mont_mul_bcast_avx2<lazy>(
+      iw1_0, _mm256_set1_epi32((int)info.istep[3][0]), c);
+  int u_end = t_end >> 1;
+  for (int u = 0; u < u_end; ++u) {
+    unsigned int* ptr = a + (u << 5);
+    last3_inv_pair<m>(ptr, iw4_0, iw2_0, iw1_0, c);
+    last3_inv_pair<m>(ptr + 16, iw4_1, iw2_1, iw1_1, c);
+    if (u + 1 < u_end) {
+      int k = std::countr_one((unsigned int)u);
+      __m256i s4 = _mm256_set1_epi32((int)info.istep[2][k]);
+      __m256i s2 = _mm256_set1_epi32((int)info.istep[3][k]);
+      __m256i s1 = _mm256_set1_epi32((int)info.istep[4][k]);
+      iw4_0 = mont_mul_bcast_avx2<lazy>(iw4_0, s4, c);
+      iw4_1 = mont_mul_bcast_avx2<lazy>(iw4_1, s4, c);
+      iw2_0 = mont_mul_bcast_avx2<lazy>(iw2_0, s2, c);
+      iw2_1 = mont_mul_bcast_avx2<lazy>(iw2_1, s2, c);
+      iw1_0 = mont_mul_bcast_avx2<lazy>(iw1_0, s1, c);
+      iw1_1 = mont_mul_bcast_avx2<lazy>(iw1_1, s1, c);
     }
   }
 }
 
-template <int m> void butterfly(unsigned int* a, int n) {
+template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
   const auto& info = ntt_info<m>;
   constexpr unsigned int mod = NttInfo<m>::mod;
   constexpr bool lazy = NttInfo<m>::lazy;
@@ -503,7 +596,13 @@ template <int m> void butterfly(unsigned int* a, int n) {
   int log_n = std::countr_zero((unsigned int)n);
 
   if (n < 16) {
-    for (int len = n >> 1; len >= 1; len >>= 1) {
+    int start_len = n >> 1;
+    if constexpr (HalfZero) {
+      std::memcpy(a + start_len, a,
+                  sizeof(unsigned int) * (unsigned int)start_len);
+      start_len >>= 1;
+    }
+    for (int len = start_len; len >= 1; len >>= 1) {
       int blocks = n / (len << 1);
       unsigned int rot = info.mont.one;
       for (int s = 0; s < blocks; ++s) {
@@ -524,27 +623,48 @@ template <int m> void butterfly(unsigned int* a, int n) {
     return;
   }
 
+  const __m256i vimag = _mm256_set1_epi32((int)info.imag);
   int h = log_n;
   if ((h - 3) & 1) {
     int p = n >> 1;
-    for (int i = 0; i < p; i += 8) {
-      __m256i x = _mm256_loadu_si256((const __m256i*)(a + i));
-      __m256i y = _mm256_loadu_si256((const __m256i*)(a + i + p));
-      _mm256_storeu_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
-      _mm256_storeu_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
+    if constexpr (HalfZero) {
+      std::memcpy(a + p, a, sizeof(unsigned int) * (unsigned int)p);
+    } else {
+      for (int i = 0; i < p; i += 8) {
+        __m256i x = _mm256_load_si256((const __m256i*)(a + i));
+        __m256i y = _mm256_load_si256((const __m256i*)(a + i + p));
+        _mm256_store_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
+        _mm256_store_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
+      }
     }
     --h;
+  } else if constexpr (HalfZero) {
+    int q = n >> 2;
+    unsigned int* p0 = a;
+    unsigned int* p1 = a + q;
+    unsigned int* p2 = p1 + q;
+    unsigned int* p3 = p2 + q;
+    for (int i = 0; i < q; i += 8) {
+      __m256i a0 = _mm256_load_si256((const __m256i*)(p0 + i));
+      __m256i a1 = _mm256_load_si256((const __m256i*)(p1 + i));
+      __m256i u3 = mont_mul_bcast_avx2<lazy>(a1, vimag, c);
+      _mm256_store_si256((__m256i*)(p0 + i), add_lim_avx2(a0, a1, c.lim));
+      _mm256_store_si256((__m256i*)(p1 + i), sub_lim_avx2(a0, a1, c.lim));
+      _mm256_store_si256((__m256i*)(p2 + i), add_lim_avx2(a0, u3, c.lim));
+      _mm256_store_si256((__m256i*)(p3 + i), sub_lim_avx2(a0, u3, c.lim));
+    }
+    h -= 2;
   }
 
-  const __m256i vimag = _mm256_set1_epi32((int)info.imag);
-  __m256i w4 = _mm256_loadu_si256((const __m256i*)info.w4_init);
-  __m256i w2 = _mm256_loadu_si256((const __m256i*)info.w2_init);
-  __m256i w1 = _mm256_loadu_si256((const __m256i*)info.w1_init);
+  __m256i w4 = _mm256_load_si256((const __m256i*)info.w4_init);
+  __m256i w2 = _mm256_load_si256((const __m256i*)info.w2_init);
+  __m256i w1 = _mm256_load_si256((const __m256i*)info.w1_init);
 
   if (h <= 13) {
-    for (; h > 3; h -= 2) {
+    for (; h > 5; h -= 2) {
       radix4_stage_fwd<m>(a, n, h, info.mont.one, c, vimag);
     }
+    if (h == 5) radix4_stage_fwd<m, 8>(a, n, 5, info.mont.one, c, vimag);
     last3_fwd<m>(a, n >> 4, w4, w2, w1, c);
     return;
   }
@@ -562,15 +682,15 @@ template <int m> void butterfly(unsigned int* a, int n) {
     radix4_stage_fwd<m>(blk, 1 << 13, 11, w_init[1], c, vimag);
     radix4_stage_fwd<m>(blk, 1 << 13, 9, w_init[2], c, vimag);
     radix4_stage_fwd<m>(blk, 1 << 13, 7, w_init[3], c, vimag);
-    radix4_stage_fwd<m>(blk, 1 << 13, 5, w_init[4], c, vimag);
+    radix4_stage_fwd<m, 8>(blk, 1 << 13, 5, w_init[4], c, vimag);
     last3_fwd<m>(blk, 1 << 9, w4, w2, w1, c);
     if (s + 1 < s_end) {
       int k = std::countr_one((unsigned int)s);
-      w_init[0] = info.mont.mul(w_init[0], info.step[1][k]);
-      w_init[1] = info.mont.mul(w_init[1], info.step[3][k]);
-      w_init[2] = info.mont.mul(w_init[2], info.step[5][k]);
-      w_init[3] = info.mont.mul(w_init[3], info.step[7][k]);
-      w_init[4] = info.mont.mul(w_init[4], info.step[9][k]);
+      w_init[0] = mont_mul_scalar<lazy>(w_init[0], info.step[1][k], info.mont);
+      w_init[1] = mont_mul_scalar<lazy>(w_init[1], info.step[3][k], info.mont);
+      w_init[2] = mont_mul_scalar<lazy>(w_init[2], info.step[5][k], info.mont);
+      w_init[3] = mont_mul_scalar<lazy>(w_init[3], info.step[7][k], info.mont);
+      w_init[4] = mont_mul_scalar<lazy>(w_init[4], info.step[9][k], info.mont);
       w4 = mont_mul_bcast_avx2<lazy>(
           w4, _mm256_set1_epi32((int)info.step[10][k]), c);
       w2 = mont_mul_bcast_avx2<lazy>(
@@ -613,23 +733,27 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   }
 
   const __m256i viimag = _mm256_set1_epi32((int)info.iimag);
-  __m256i iw4 = _mm256_loadu_si256((const __m256i*)info.iw4_init);
-  __m256i iw2 = _mm256_loadu_si256((const __m256i*)info.iw2_init);
-  __m256i iw1 = _mm256_loadu_si256((const __m256i*)info.iw1_init);
+  __m256i iw4 = _mm256_load_si256((const __m256i*)info.iw4_init);
+  __m256i iw2 = _mm256_load_si256((const __m256i*)info.iw2_init);
+  __m256i iw1 = _mm256_load_si256((const __m256i*)info.iw1_init);
 
   if (log_n <= 13) {
     last3_inv<m>(a, n >> 4, iw4, iw2, iw1, c);
     int h = 5;
+    if (h <= log_n) {
+      radix4_stage_inv<m, 8>(a, n, 5, info.mont.one, c, viimag);
+      h = 7;
+    }
     for (; h <= log_n; h += 2) {
       radix4_stage_inv<m>(a, n, h, info.mont.one, c, viimag);
     }
     if (h - 1 == log_n) {
       int p = n >> 1;
       for (int i = 0; i < p; i += 8) {
-        __m256i x = _mm256_loadu_si256((const __m256i*)(a + i));
-        __m256i y = _mm256_loadu_si256((const __m256i*)(a + i + p));
-        _mm256_storeu_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
-        _mm256_storeu_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
+        __m256i x = _mm256_load_si256((const __m256i*)(a + i));
+        __m256i y = _mm256_load_si256((const __m256i*)(a + i + p));
+        _mm256_store_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
+        _mm256_store_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
       }
     }
     return;
@@ -641,18 +765,23 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   for (int s = 0; s < s_end; ++s) {
     unsigned int* blk = a + (s << 13);
     last3_inv<m>(blk, 1 << 9, iw4, iw2, iw1, c);
-    radix4_stage_inv<m>(blk, 1 << 13, 5, iw_init[4], c, viimag);
+    radix4_stage_inv<m, 8>(blk, 1 << 13, 5, iw_init[4], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 7, iw_init[3], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 9, iw_init[2], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 11, iw_init[1], c, viimag);
     radix4_stage_inv<m>(blk, 1 << 13, 13, iw_init[0], c, viimag);
     if (s + 1 < s_end) {
       int k = std::countr_one((unsigned int)s);
-      iw_init[0] = info.mont.mul(iw_init[0], info.istep[1][k]);
-      iw_init[1] = info.mont.mul(iw_init[1], info.istep[3][k]);
-      iw_init[2] = info.mont.mul(iw_init[2], info.istep[5][k]);
-      iw_init[3] = info.mont.mul(iw_init[3], info.istep[7][k]);
-      iw_init[4] = info.mont.mul(iw_init[4], info.istep[9][k]);
+      iw_init[0] =
+          mont_mul_scalar<lazy>(iw_init[0], info.istep[1][k], info.mont);
+      iw_init[1] =
+          mont_mul_scalar<lazy>(iw_init[1], info.istep[3][k], info.mont);
+      iw_init[2] =
+          mont_mul_scalar<lazy>(iw_init[2], info.istep[5][k], info.mont);
+      iw_init[3] =
+          mont_mul_scalar<lazy>(iw_init[3], info.istep[7][k], info.mont);
+      iw_init[4] =
+          mont_mul_scalar<lazy>(iw_init[4], info.istep[9][k], info.mont);
       iw4 = mont_mul_bcast_avx2<lazy>(
           iw4, _mm256_set1_epi32((int)info.istep[10][k]), c);
       iw2 = mont_mul_bcast_avx2<lazy>(
@@ -669,10 +798,10 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   if (h - 1 == log_n) {
     int p = n >> 1;
     for (int i = 0; i < p; i += 8) {
-      __m256i x = _mm256_loadu_si256((const __m256i*)(a + i));
-      __m256i y = _mm256_loadu_si256((const __m256i*)(a + i + p));
-      _mm256_storeu_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
-      _mm256_storeu_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
+      __m256i x = _mm256_load_si256((const __m256i*)(a + i));
+      __m256i y = _mm256_load_si256((const __m256i*)(a + i + p));
+      _mm256_store_si256((__m256i*)(a + i), add_lim_avx2(x, y, c.lim));
+      _mm256_store_si256((__m256i*)(a + i + p), sub_lim_avx2(x, y, c.lim));
     }
   }
 }
@@ -684,55 +813,207 @@ void pointwise_mul(unsigned int* a, const unsigned int* b, int n) {
   const Avx2MontConsts c = Avx2MontConsts::create(mod, lazy ? mod * 2U : mod);
   int i = 0;
   for (; i + 8 <= n; i += 8) {
-    __m256i va = _mm256_loadu_si256((const __m256i*)(a + i));
-    __m256i vb = _mm256_loadu_si256((const __m256i*)(b + i));
-    _mm256_storeu_si256((__m256i*)(a + i), mont_mul_avx2<lazy>(va, vb, c));
+    __m256i va = _mm256_load_si256((const __m256i*)(a + i));
+    __m256i vb = _mm256_load_si256((const __m256i*)(b + i));
+    _mm256_store_si256((__m256i*)(a + i), mont_mul_avx2<lazy>(va, vb, c));
   }
   for (; i < n; ++i) {
-    if constexpr (lazy) {
-      a[i] = ntt_info<m>.mont.mul_2m(a[i], b[i]);
-    } else {
-      a[i] = ntt_info<m>.mont.mul(a[i], b[i]);
-    }
+    a[i] = mont_mul_scalar<lazy>(a[i], b[i], ntt_info<m>.mont);
   }
 }
 
-template <int m> void scale_out(unsigned int* a, int n, unsigned int factor) {
+template <int m>
+void scale_out(const unsigned int* src, unsigned int* dst, int n,
+               unsigned int factor) {
   constexpr unsigned int mod = NttInfo<m>::mod;
   const Avx2MontConsts c = Avx2MontConsts::create(mod, mod);
   __m256i vf = _mm256_set1_epi32((int)factor);
   int i = 0;
   for (; i + 8 <= n; i += 8) {
-    __m256i va = _mm256_loadu_si256((const __m256i*)(a + i));
-    _mm256_storeu_si256((__m256i*)(a + i),
+    __m256i va = _mm256_load_si256((const __m256i*)(src + i));
+    _mm256_storeu_si256((__m256i*)(dst + i),
                         mont_mul_bcast_avx2<false>(va, vf, c));
   }
-  for (; i < n; ++i) a[i] = ntt_info<m>.mont.mul(a[i], factor);
+  for (; i < n; ++i) dst[i] = ntt_info<m>.mont.mul(src[i], factor);
+}
+
+template <int m>
+void scale_out_modint(const unsigned int* src, StaticModInt<m>* dst, int n,
+                      unsigned int factor) {
+  constexpr unsigned int mod = NttInfo<m>::mod;
+  const Avx2MontConsts c = Avx2MontConsts::create(mod, mod);
+  __m256i vf = _mm256_set1_epi32((int)factor);
+  int i = 0;
+  for (; i + 8 <= n; i += 8) {
+    __m256i va = _mm256_load_si256((const __m256i*)(src + i));
+    __m256i vr = mont_mul_bcast_avx2<false>(va, vf, c);
+    alignas(32) unsigned int tmp[8];
+    _mm256_store_si256((__m256i*)tmp, vr);
+    for (int j = 0; j < 8; ++j) dst[i + j] = StaticModInt<m>::raw(tmp[j]);
+  }
+  for (; i < n; ++i) {
+    dst[i] = StaticModInt<m>::raw(ntt_info<m>.mont.mul(src[i], factor));
+  }
 }
 
 #else
 
-template <bool Lazy>
-inline unsigned int add_lim_scalar(unsigned int a, unsigned int b,
-                                   unsigned int lim) {
-  unsigned int s = a + b;
-  return s >= lim ? s - lim : s;
+template <int m, int FixedQ = 0>
+inline void radix4_stage_scalar_fwd(unsigned int* a, int n, int h,
+                                    unsigned int w1) {
+  const auto& info = ntt_info<m>;
+  constexpr bool lazy = NttInfo<m>::lazy;
+  constexpr unsigned int lim = lazy ? NttInfo<m>::mod * 2U : NttInfo<m>::mod;
+  if constexpr (FixedQ == 1) {
+    int blocks = n >> 2;
+    auto bfly4 = [&](unsigned int* p, unsigned int w1_s) {
+      unsigned int w2_s = mont_mul_scalar<lazy>(w1_s, w1_s, info.mont);
+      unsigned int w3_s = mont_mul_scalar<lazy>(w1_s, w2_s, info.mont);
+      unsigned int a0 = p[0];
+      unsigned int x1 = mont_mul_scalar<lazy>(p[1], w1_s, info.mont);
+      unsigned int x2 = mont_mul_scalar<lazy>(p[2], w2_s, info.mont);
+      unsigned int x3 = mont_mul_scalar<lazy>(p[3], w3_s, info.mont);
+      unsigned int u0 = add_lim_scalar<lazy>(a0, x2, lim);
+      unsigned int u2 = sub_lim_scalar<lazy>(a0, x2, lim);
+      unsigned int u1 = add_lim_scalar<lazy>(x1, x3, lim);
+      unsigned int u3 =
+          mont_mul_scalar<lazy>(x1 + lim - x3, info.imag, info.mont);
+      p[0] = add_lim_scalar<lazy>(u0, u1, lim);
+      p[1] = sub_lim_scalar<lazy>(u0, u1, lim);
+      p[2] = add_lim_scalar<lazy>(u2, u3, lim);
+      p[3] = sub_lim_scalar<lazy>(u2, u3, lim);
+    };
+    if (blocks == 1) {
+      bfly4(a, w1);
+      return;
+    }
+    unsigned int w1_0 = w1;
+    unsigned int w1_1 = mont_mul_scalar<lazy>(w1, info.step[1][0], info.mont);
+    int u_end = blocks >> 1;
+    for (int u = 0; u < u_end; ++u) {
+      unsigned int* p = a + (u << 3);
+      bfly4(p, w1_0);
+      bfly4(p + 4, w1_1);
+      if (u + 1 < u_end) {
+        unsigned int st = info.step[2][std::countr_one((unsigned int)u)];
+        w1_0 = mont_mul_scalar<lazy>(w1_0, st, info.mont);
+        w1_1 = mont_mul_scalar<lazy>(w1_1, st, info.mont);
+      }
+    }
+    return;
+  }
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
+  for (int s = 0; s < blocks; ++s) {
+    unsigned int w2 = mont_mul_scalar<lazy>(w1, w1, info.mont);
+    unsigned int w3 = mont_mul_scalar<lazy>(w1, w2, info.mont);
+    unsigned int* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
+    unsigned int* p1 = p0 + q;
+    unsigned int* p2 = p1 + q;
+    unsigned int* p3 = p2 + q;
+    for (int i = 0; i < q; ++i) {
+      unsigned int a0 = p0[i];
+      unsigned int x1 = mont_mul_scalar<lazy>(p1[i], w1, info.mont);
+      unsigned int x2 = mont_mul_scalar<lazy>(p2[i], w2, info.mont);
+      unsigned int x3 = mont_mul_scalar<lazy>(p3[i], w3, info.mont);
+
+      unsigned int u0 = add_lim_scalar<lazy>(a0, x2, lim);
+      unsigned int u2 = sub_lim_scalar<lazy>(a0, x2, lim);
+      unsigned int u1 = add_lim_scalar<lazy>(x1, x3, lim);
+      unsigned int u3 =
+          mont_mul_scalar<lazy>(x1 + lim - x3, info.imag, info.mont);
+
+      p0[i] = add_lim_scalar<lazy>(u0, u1, lim);
+      p1[i] = sub_lim_scalar<lazy>(u0, u1, lim);
+      p2[i] = add_lim_scalar<lazy>(u2, u3, lim);
+      p3[i] = sub_lim_scalar<lazy>(u2, u3, lim);
+    }
+    if (s + 1 < blocks) {
+      w1 = mont_mul_scalar<lazy>(
+          w1, info.step[1][std::countr_one((unsigned int)s)], info.mont);
+    }
+  }
 }
 
-template <bool Lazy>
-inline unsigned int sub_lim_scalar(unsigned int a, unsigned int b,
-                                   unsigned int lim) {
-  return a >= b ? a - b : a + lim - b;
+template <int m, int FixedQ = 0>
+inline void radix4_stage_scalar_inv(unsigned int* a, int n, int h,
+                                    unsigned int iw1) {
+  const auto& info = ntt_info<m>;
+  constexpr bool lazy = NttInfo<m>::lazy;
+  constexpr unsigned int lim = lazy ? NttInfo<m>::mod * 2U : NttInfo<m>::mod;
+  if constexpr (FixedQ == 1) {
+    int blocks = n >> 2;
+    auto bfly4_inv = [&](unsigned int* p, unsigned int iw1_s) {
+      unsigned int iw2_s = mont_mul_scalar<lazy>(iw1_s, iw1_s, info.mont);
+      unsigned int iw3_s = mont_mul_scalar<lazy>(iw1_s, iw2_s, info.mont);
+      unsigned int c0 = p[0];
+      unsigned int c1 = p[1];
+      unsigned int c2 = p[2];
+      unsigned int c3 = p[3];
+      unsigned int u0 = add_lim_scalar<lazy>(c0, c1, lim);
+      unsigned int u1 = sub_lim_scalar<lazy>(c0, c1, lim);
+      unsigned int u2 = add_lim_scalar<lazy>(c2, c3, lim);
+      unsigned int u3 =
+          mont_mul_scalar<lazy>(c2 + lim - c3, info.iimag, info.mont);
+      p[0] = add_lim_scalar<lazy>(u0, u2, lim);
+      p[2] = mont_mul_scalar<lazy>(u0 + lim - u2, iw2_s, info.mont);
+      p[1] = mont_mul_scalar<lazy>(u1 + u3, iw1_s, info.mont);
+      p[3] = mont_mul_scalar<lazy>(u1 + lim - u3, iw3_s, info.mont);
+    };
+    if (blocks == 1) {
+      bfly4_inv(a, iw1);
+      return;
+    }
+    unsigned int iw1_0 = iw1;
+    unsigned int iw1_1 =
+        mont_mul_scalar<lazy>(iw1, info.istep[1][0], info.mont);
+    int u_end = blocks >> 1;
+    for (int u = 0; u < u_end; ++u) {
+      unsigned int* p = a + (u << 3);
+      bfly4_inv(p, iw1_0);
+      bfly4_inv(p + 4, iw1_1);
+      if (u + 1 < u_end) {
+        unsigned int st = info.istep[2][std::countr_one((unsigned int)u)];
+        iw1_0 = mont_mul_scalar<lazy>(iw1_0, st, info.mont);
+        iw1_1 = mont_mul_scalar<lazy>(iw1_1, st, info.mont);
+      }
+    }
+    return;
+  }
+  int q = FixedQ > 0 ? FixedQ : (1 << (h - 2));
+  int blocks = FixedQ > 0 ? (n / (FixedQ << 2)) : (n >> h);
+  for (int s = 0; s < blocks; ++s) {
+    unsigned int iw2 = mont_mul_scalar<lazy>(iw1, iw1, info.mont);
+    unsigned int iw3 = mont_mul_scalar<lazy>(iw1, iw2, info.mont);
+    unsigned int* p0 = a + (FixedQ > 0 ? s * (FixedQ << 2) : (s << h));
+    unsigned int* p1 = p0 + q;
+    unsigned int* p2 = p1 + q;
+    unsigned int* p3 = p2 + q;
+    for (int i = 0; i < q; ++i) {
+      unsigned int c0 = p0[i];
+      unsigned int c1 = p1[i];
+      unsigned int c2 = p2[i];
+      unsigned int c3 = p3[i];
+
+      unsigned int u0 = add_lim_scalar<lazy>(c0, c1, lim);
+      unsigned int u1 = sub_lim_scalar<lazy>(c0, c1, lim);
+      unsigned int u2 = add_lim_scalar<lazy>(c2, c3, lim);
+      unsigned int u3 =
+          mont_mul_scalar<lazy>(c2 + lim - c3, info.iimag, info.mont);
+
+      p0[i] = add_lim_scalar<lazy>(u0, u2, lim);
+      p2[i] = mont_mul_scalar<lazy>(u0 + lim - u2, iw2, info.mont);
+      p1[i] = mont_mul_scalar<lazy>(u1 + u3, iw1, info.mont);
+      p3[i] = mont_mul_scalar<lazy>(u1 + lim - u3, iw3, info.mont);
+    }
+    if (s + 1 < blocks) {
+      iw1 = mont_mul_scalar<lazy>(
+          iw1, info.istep[1][std::countr_one((unsigned int)s)], info.mont);
+    }
+  }
 }
 
-template <bool Lazy>
-inline unsigned int mont_mul_scalar(unsigned int a, unsigned int b,
-                                    const Montgomery32& mont) {
-  if constexpr (Lazy) return mont.mul_2m(a, b);
-  return mont.mul(a, b);
-}
-
-template <int m> void butterfly(unsigned int* a, int n) {
+template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
   const auto& info = ntt_info<m>;
   constexpr unsigned int mod = NttInfo<m>::mod;
   constexpr bool lazy = NttInfo<m>::lazy;
@@ -742,46 +1023,65 @@ template <int m> void butterfly(unsigned int* a, int n) {
   int h = log_n;
   if (h & 1) {
     int p = n >> 1;
-    for (int i = 0; i < p; ++i) {
-      unsigned int x = a[i];
-      unsigned int y = a[i + p];
-      a[i] = add_lim_scalar<lazy>(x, y, lim);
-      a[i + p] = sub_lim_scalar<lazy>(x, y, lim);
+    if constexpr (HalfZero) {
+      std::memcpy(a + p, a, sizeof(unsigned int) * (unsigned int)p);
+    } else {
+      for (int i = 0; i < p; ++i) {
+        unsigned int x = a[i];
+        unsigned int y = a[i + p];
+        a[i] = add_lim_scalar<lazy>(x, y, lim);
+        a[i + p] = sub_lim_scalar<lazy>(x, y, lim);
+      }
     }
     --h;
-  }
-
-  for (; h >= 2; h -= 2) {
-    int q = 1 << (h - 2);
-    int blocks = n >> h;
-    unsigned int w1 = info.mont.one;
-    for (int s = 0; s < blocks; ++s) {
-      unsigned int w2 = info.mont.mul(w1, w1);
-      unsigned int w3 = info.mont.mul(w1, w2);
-      unsigned int* p0 = a + (s << h);
-      unsigned int* p1 = p0 + q;
+  } else if constexpr (HalfZero) {
+    if (n >= 4) {
+      int q = n >> 2;
+      unsigned int* p0 = a;
+      unsigned int* p1 = a + q;
       unsigned int* p2 = p1 + q;
       unsigned int* p3 = p2 + q;
       for (int i = 0; i < q; ++i) {
         unsigned int a0 = p0[i];
-        unsigned int x1 = mont_mul_scalar<lazy>(p1[i], w1, info.mont);
-        unsigned int x2 = mont_mul_scalar<lazy>(p2[i], w2, info.mont);
-        unsigned int x3 = mont_mul_scalar<lazy>(p3[i], w3, info.mont);
-
-        unsigned int u0 = add_lim_scalar<lazy>(a0, x2, lim);
-        unsigned int u2 = sub_lim_scalar<lazy>(a0, x2, lim);
-        unsigned int u1 = add_lim_scalar<lazy>(x1, x3, lim);
-        unsigned int u3 =
-            mont_mul_scalar<lazy>(x1 + lim - x3, info.imag, info.mont);
-
-        p0[i] = add_lim_scalar<lazy>(u0, u1, lim);
-        p1[i] = sub_lim_scalar<lazy>(u0, u1, lim);
-        p2[i] = add_lim_scalar<lazy>(u2, u3, lim);
-        p3[i] = sub_lim_scalar<lazy>(u2, u3, lim);
+        unsigned int a1 = p1[i];
+        unsigned int u3 = mont_mul_scalar<lazy>(a1, info.imag, info.mont);
+        p0[i] = add_lim_scalar<lazy>(a0, a1, lim);
+        p1[i] = sub_lim_scalar<lazy>(a0, a1, lim);
+        p2[i] = add_lim_scalar<lazy>(a0, u3, lim);
+        p3[i] = sub_lim_scalar<lazy>(a0, u3, lim);
       }
-      if (s + 1 < blocks) {
-        w1 = info.mont.mul(w1, info.step[1][std::countr_one((unsigned int)s)]);
-      }
+      h -= 2;
+    }
+  }
+
+  if (h <= 12) {
+    for (; h >= 6; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one);
+    if (h >= 4) radix4_stage_scalar_fwd<m, 4>(a, n, 4, info.mont.one);
+    if (h >= 2) radix4_stage_scalar_fwd<m, 1>(a, n, 2, info.mont.one);
+    return;
+  }
+
+  for (; h > 12; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one);
+
+  unsigned int w_init[6] = {info.mont.one, info.mont.one, info.mont.one,
+                            info.mont.one, info.mont.one, info.mont.one};
+  int s_end = n >> 12;
+  for (int s = 0; s < s_end; ++s) {
+    unsigned int* blk = a + (s << 12);
+    radix4_stage_scalar_fwd<m>(blk, 1 << 12, 12, w_init[0]);
+    radix4_stage_scalar_fwd<m>(blk, 1 << 12, 10, w_init[1]);
+    radix4_stage_scalar_fwd<m>(blk, 1 << 12, 8, w_init[2]);
+    radix4_stage_scalar_fwd<m>(blk, 1 << 12, 6, w_init[3]);
+    radix4_stage_scalar_fwd<m, 4>(blk, 1 << 12, 4, w_init[4]);
+    radix4_stage_scalar_fwd<m, 1>(blk, 1 << 12, 2, w_init[5]);
+    if (s + 1 < s_end) {
+      int k = std::countr_one((unsigned int)s);
+      w_init[0] = mont_mul_scalar<lazy>(w_init[0], info.step[1][k], info.mont);
+      w_init[1] = mont_mul_scalar<lazy>(w_init[1], info.step[3][k], info.mont);
+      w_init[2] = mont_mul_scalar<lazy>(w_init[2], info.step[5][k], info.mont);
+      w_init[3] = mont_mul_scalar<lazy>(w_init[3], info.step[7][k], info.mont);
+      w_init[4] = mont_mul_scalar<lazy>(w_init[4], info.step[9][k], info.mont);
+      w_init[5] = mont_mul_scalar<lazy>(w_init[5], info.step[11][k], info.mont);
     }
   }
 }
@@ -794,42 +1094,56 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   int log_n = std::countr_zero((unsigned int)n);
 
   int h = 2;
-  for (; h <= log_n; h += 2) {
-    int q = 1 << (h - 2);
-    int blocks = n >> h;
-    unsigned int iw1 = info.mont.one;
-    for (int s = 0; s < blocks; ++s) {
-      unsigned int iw2 = info.mont.mul(iw1, iw1);
-      unsigned int iw3 = info.mont.mul(iw1, iw2);
-      unsigned int* p0 = a + (s << h);
-      unsigned int* p1 = p0 + q;
-      unsigned int* p2 = p1 + q;
-      unsigned int* p3 = p2 + q;
-      for (int i = 0; i < q; ++i) {
-        unsigned int c0 = p0[i];
-        unsigned int c1 = p1[i];
-        unsigned int c2 = p2[i];
-        unsigned int c3 = p3[i];
-
-        unsigned int u0 = add_lim_scalar<lazy>(c0, c1, lim);
-        unsigned int u1 = sub_lim_scalar<lazy>(c0, c1, lim);
-        unsigned int u2 = add_lim_scalar<lazy>(c2, c3, lim);
-        unsigned int u3 =
-            mont_mul_scalar<lazy>(c2 + lim - c3, info.iimag, info.mont);
-
-        p0[i] = add_lim_scalar<lazy>(u0, u2, lim);
-        p2[i] = mont_mul_scalar<lazy>(u0 + lim - u2, iw2, info.mont);
-        p1[i] = mont_mul_scalar<lazy>(u1 + u3, iw1, info.mont);
-        p3[i] = mont_mul_scalar<lazy>(u1 + lim - u3, iw3, info.mont);
+  if (log_n <= 12) {
+    if (2 <= log_n) radix4_stage_scalar_inv<m, 1>(a, n, 2, info.mont.one);
+    if (4 <= log_n) radix4_stage_scalar_inv<m, 4>(a, n, 4, info.mont.one);
+    for (h = 6; h <= log_n; h += 2) {
+      radix4_stage_scalar_inv<m>(a, n, h, info.mont.one);
+    }
+    if ((log_n & 1) != 0) {
+      int p = n >> 1;
+      for (int i = 0; i < p; ++i) {
+        unsigned int x = a[i];
+        unsigned int y = a[i + p];
+        a[i] = add_lim_scalar<lazy>(x, y, lim);
+        a[i + p] = sub_lim_scalar<lazy>(x, y, lim);
       }
-      if (s + 1 < blocks) {
-        iw1 =
-            info.mont.mul(iw1, info.istep[1][std::countr_one((unsigned int)s)]);
-      }
+    }
+    return;
+  }
+
+  unsigned int iw_init[6] = {info.mont.one, info.mont.one, info.mont.one,
+                             info.mont.one, info.mont.one, info.mont.one};
+  int s_end = n >> 12;
+  for (int s = 0; s < s_end; ++s) {
+    unsigned int* blk = a + (s << 12);
+    radix4_stage_scalar_inv<m, 1>(blk, 1 << 12, 2, iw_init[5]);
+    radix4_stage_scalar_inv<m, 4>(blk, 1 << 12, 4, iw_init[4]);
+    radix4_stage_scalar_inv<m>(blk, 1 << 12, 6, iw_init[3]);
+    radix4_stage_scalar_inv<m>(blk, 1 << 12, 8, iw_init[2]);
+    radix4_stage_scalar_inv<m>(blk, 1 << 12, 10, iw_init[1]);
+    radix4_stage_scalar_inv<m>(blk, 1 << 12, 12, iw_init[0]);
+    if (s + 1 < s_end) {
+      int k = std::countr_one((unsigned int)s);
+      iw_init[0] =
+          mont_mul_scalar<lazy>(iw_init[0], info.istep[1][k], info.mont);
+      iw_init[1] =
+          mont_mul_scalar<lazy>(iw_init[1], info.istep[3][k], info.mont);
+      iw_init[2] =
+          mont_mul_scalar<lazy>(iw_init[2], info.istep[5][k], info.mont);
+      iw_init[3] =
+          mont_mul_scalar<lazy>(iw_init[3], info.istep[7][k], info.mont);
+      iw_init[4] =
+          mont_mul_scalar<lazy>(iw_init[4], info.istep[9][k], info.mont);
+      iw_init[5] =
+          mont_mul_scalar<lazy>(iw_init[5], info.istep[11][k], info.mont);
     }
   }
 
-  if (h - 1 == log_n) {
+  for (h = 14; h <= log_n; h += 2) {
+    radix4_stage_scalar_inv<m>(a, n, h, info.mont.one);
+  }
+  if (log_n & 1) {
     int p = n >> 1;
     for (int i = 0; i < p; ++i) {
       unsigned int x = a[i];
@@ -847,8 +1161,18 @@ void pointwise_mul(unsigned int* a, const unsigned int* b, int n) {
   }
 }
 
-template <int m> void scale_out(unsigned int* a, int n, unsigned int factor) {
-  for (int i = 0; i < n; ++i) a[i] = ntt_info<m>.mont.mul(a[i], factor);
+template <int m>
+void scale_out(const unsigned int* src, unsigned int* dst, int n,
+               unsigned int factor) {
+  for (int i = 0; i < n; ++i) dst[i] = ntt_info<m>.mont.mul(src[i], factor);
+}
+
+template <int m>
+void scale_out_modint(const unsigned int* src, StaticModInt<m>* dst, int n,
+                      unsigned int factor) {
+  for (int i = 0; i < n; ++i) {
+    dst[i] = StaticModInt<m>::raw(ntt_info<m>.mont.mul(src[i], factor));
+  }
 }
 
 #endif  // __AVX2__
@@ -873,35 +1197,12 @@ std::vector<unsigned int> convolution_naive(const unsigned int* a, int n,
   return ans;
 }
 
-template <int m>
-void run_ntt_convolution(unsigned int* a, unsigned int* b, int z, int s,
-                         bool same_input) {
-  butterfly<m>(a, z);
-  if (same_input) {
-    pointwise_mul<m>(a, a, z);
-  } else {
-    butterfly<m>(b, z);
-    pointwise_mul<m>(a, b, z);
-  }
-  butterfly_inv<m>(a, z);
-
-  const auto& info = ntt_info<m>;
-  unsigned int iz_mont =
-      info.mont.pow(info.mont.mul((unsigned int)z, info.mont.r2), info.mod - 2);
-  unsigned int factor = info.mont.mul(iz_mont, info.mont.r2);
-  scale_out<m>(a, s, factor);
-}
-
-template <int m> void check_convolution_constraints(long long s) {
-  assert(NttInfo<m>::valid);
-  if (s > 0) assert(s <= (1LL << NttInfo<m>::rank2));
-}
-
 template <int m, typename T>
 void fill_raw_vector(const std::vector<T>& v, unsigned int* dst) {
   int n = (int)v.size();
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     dst[i] = (unsigned int)StaticModInt<m>(v[i]).val();
+  }
 }
 
 template <int m>
@@ -920,36 +1221,53 @@ void fill_raw_vector_mod(const std::vector<long long>& v, unsigned int* dst) {
   }
 }
 
-template <int m, typename T>
-std::vector<unsigned int> convolution_dispatch(const std::vector<T>& a,
-                                               const std::vector<T>& b) {
-  int n = (int)a.size();
-  int k = (int)b.size();
-  int s = n + k - 1;
-  bool same_input = (&a == &b);
-  if (std::min(n, k) <= naive_threshold) {
-    std::vector<unsigned int> raw_a(n);
-    fill_raw_vector<m>(a, raw_a.data());
-    if (same_input) {
-      return convolution_naive<m>(raw_a.data(), n, raw_a.data(), n);
+template <int m> void forward_prepared(unsigned int* dst, int n, int z) {
+  int half = z >> 1;
+  if (z >= 4 && n <= half) {
+    if (n < half) {
+      std::memset(dst + n, 0, sizeof(unsigned int) * (unsigned int)(half - n));
     }
-    std::vector<unsigned int> raw_b(k);
-    fill_raw_vector<m>(b, raw_b.data());
-    return convolution_naive<m>(raw_a.data(), n, raw_b.data(), k);
-  }
-
-  int z = (int)std::bit_ceil((unsigned int)s);
-  std::vector<unsigned int> raw_a(z);
-  fill_raw_vector<m>(a, raw_a.data());
-  if (same_input) {
-    run_ntt_convolution<m>(raw_a.data(), nullptr, z, s, true);
+    butterfly<m, true>(dst, z);
   } else {
-    std::vector<unsigned int> raw_b(z);
-    fill_raw_vector<m>(b, raw_b.data());
-    run_ntt_convolution<m>(raw_a.data(), raw_b.data(), z, s, false);
+    if (n < z) {
+      std::memset(dst + n, 0, sizeof(unsigned int) * (unsigned int)(z - n));
+    }
+    butterfly<m, false>(dst, z);
   }
-  raw_a.resize(s);
-  return raw_a;
+}
+
+template <int m, typename Vec>
+void fill_and_forward(const Vec& v, unsigned int* dst, int z) {
+  fill_raw_vector<m>(v, dst);
+  forward_prepared<m>(dst, (int)v.size(), z);
+}
+
+template <int m>
+void fill_mod_and_forward(const std::vector<long long>& v, unsigned int* dst,
+                          int z) {
+  fill_raw_vector_mod<m>(v, dst);
+  forward_prepared<m>(dst, (int)v.size(), z);
+}
+
+template <int m>
+unsigned int finish_ntt_convolution(unsigned int* a, unsigned int* b, int z,
+                                    bool same_input) {
+  if (same_input) {
+    pointwise_mul<m>(a, a, z);
+  } else {
+    pointwise_mul<m>(a, b, z);
+  }
+  butterfly_inv<m>(a, z);
+
+  const auto& info = ntt_info<m>;
+  unsigned int iz_mont =
+      info.mont.pow(info.mont.mul((unsigned int)z, info.mont.r2), info.mod - 2);
+  return info.mont.mul(iz_mont, info.mont.r2);
+}
+
+template <int m> void check_convolution_constraints(long long s) {
+  assert(NttInfo<m>::valid);
+  if (s > 0) assert(s <= (1LL << NttInfo<m>::rank2));
 }
 
 constexpr unsigned int inv_mod_constexpr(unsigned int a, unsigned int m) {
@@ -964,39 +1282,86 @@ constexpr unsigned int inv_mod_constexpr(unsigned int a, unsigned int m) {
   return (unsigned int)res;
 }
 
+template <int m, typename OutT, typename InT>
+std::vector<OutT> convolution_impl(const std::vector<InT>& a,
+                                   const std::vector<InT>& b) {
+  assert(NttInfo<m>::valid);
+  if (a.empty() || b.empty()) return {};
+  int n = (int)a.size();
+  int k = (int)b.size();
+  long long s = (long long)n + k - 1;
+  check_convolution_constraints<m>(s);
+
+  auto write_out = [](const unsigned int* src, std::vector<OutT>& dst,
+                      int len) {
+    for (int i = 0; i < len; ++i) {
+      if constexpr (std::is_same_v<OutT, StaticModInt<m>>) {
+        dst[i] = StaticModInt<m>::raw(src[i]);
+      } else {
+        dst[i] = (OutT)src[i];
+      }
+    }
+  };
+
+  bool same_input = (&a == &b);
+  if (std::min(n, k) <= naive_threshold) {
+    AlignedBuffer raw_a(n);
+    fill_raw_vector<m>(a, raw_a.data);
+    std::vector<unsigned int> raw_c;
+    if (same_input) {
+      raw_c = convolution_naive<m>(raw_a.data, n, raw_a.data, n);
+    } else {
+      AlignedBuffer raw_b(k);
+      fill_raw_vector<m>(b, raw_b.data);
+      raw_c = convolution_naive<m>(raw_a.data, n, raw_b.data, k);
+    }
+    std::vector<OutT> res((int)s);
+    write_out(raw_c.data(), res, (int)s);
+    return res;
+  }
+
+  int z = (int)std::bit_ceil((unsigned int)s);
+  AlignedBuffer raw_a(z);
+  fill_and_forward<m>(a, raw_a.data, z);
+
+  unsigned int factor = 0;
+  if (same_input) {
+    factor = finish_ntt_convolution<m>(raw_a.data, nullptr, z, true);
+  } else {
+    AlignedBuffer raw_b(z);
+    fill_and_forward<m>(b, raw_b.data, z);
+    factor = finish_ntt_convolution<m>(raw_a.data, raw_b.data, z, false);
+  }
+
+  if constexpr (std::is_same_v<OutT, StaticModInt<m>>) {
+    std::vector<StaticModInt<m>> res((int)s);
+    scale_out_modint<m>(raw_a.data, res.data(), (int)s, factor);
+    return res;
+  } else if constexpr (std::is_same_v<OutT, unsigned int>) {
+    std::vector<unsigned int> res((int)s);
+    scale_out<m>(raw_a.data, res.data(), (int)s, factor);
+    return res;
+  } else {
+    scale_out<m>(raw_a.data, raw_a.data, (int)s, factor);
+    std::vector<OutT> res((int)s);
+    write_out(raw_a.data, res, (int)s);
+    return res;
+  }
+}
+
 }  // namespace internal_convolution
 
 template <int m>
 std::vector<StaticModInt<m>> convolution(
     const std::vector<StaticModInt<m>>& a,
     const std::vector<StaticModInt<m>>& b) {
-  assert(internal_convolution::NttInfo<m>::valid);
-  if (a.empty() || b.empty()) return {};
-  long long s = (long long)a.size() + (long long)b.size() - 1;
-  internal_convolution::check_convolution_constraints<m>(s);
-
-  std::vector<unsigned int> raw_c =
-      internal_convolution::convolution_dispatch<m>(a, b);
-  std::vector<StaticModInt<m>> res(raw_c.size());
-  for (int i = 0; i < (int)raw_c.size(); ++i) {
-    res[i] = StaticModInt<m>::raw(raw_c[i]);
-  }
-  return res;
+  return internal_convolution::convolution_impl<m, StaticModInt<m>>(a, b);
 }
 
 template <int m = 998244353, typename T>
   requires internal::is_integer_v<T>
 std::vector<T> convolution(const std::vector<T>& a, const std::vector<T>& b) {
-  assert(internal_convolution::NttInfo<m>::valid);
-  if (a.empty() || b.empty()) return {};
-  long long s = (long long)a.size() + (long long)b.size() - 1;
-  internal_convolution::check_convolution_constraints<m>(s);
-
-  std::vector<unsigned int> raw_c =
-      internal_convolution::convolution_dispatch<m>(a, b);
-  std::vector<T> res(raw_c.size());
-  for (int i = 0; i < (int)raw_c.size(); ++i) res[i] = (T)raw_c[i];
-  return res;
+  return internal_convolution::convolution_impl<m, T>(a, b);
 }
 
 inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
@@ -1039,30 +1404,31 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
 
   bool same_input = (&a == &b);
   int z = (int)std::bit_ceil((unsigned int)s);
-  std::vector<unsigned int> rb(same_input ? 0 : z);
+  internal_convolution::AlignedBuffer ra(z);
+  internal_convolution::AlignedBuffer rb(same_input ? 0 : z);
 
-  auto run = [&](auto tag) {
+  auto run = [&](auto tag, unsigned int* out) {
     constexpr int mod = decltype(tag)::value;
-    std::vector<unsigned int> ra(z);
-    internal_convolution::fill_raw_vector_mod<mod>(a, ra.data());
+    internal_convolution::fill_mod_and_forward<mod>(a, ra.data, z);
     if (!same_input) {
-      std::fill(rb.begin() + k, rb.end(), 0U);
-      internal_convolution::fill_raw_vector_mod<mod>(b, rb.data());
+      internal_convolution::fill_mod_and_forward<mod>(b, rb.data, z);
     }
-    internal_convolution::run_ntt_convolution<mod>(
-        ra.data(), same_input ? nullptr : rb.data(), z, (int)s, same_input);
-    return ra;
+    unsigned int factor = internal_convolution::finish_ntt_convolution<mod>(
+        ra.data, same_input ? nullptr : rb.data, z, same_input);
+    internal_convolution::scale_out<mod>(ra.data, out, (int)s, factor);
   };
 
-  std::vector<unsigned int> c1 = run(std::integral_constant<int, m1>{});
-  std::vector<unsigned int> c2 = run(std::integral_constant<int, m2>{});
-  std::vector<unsigned int> c3 = run(std::integral_constant<int, m3>{});
+  internal_convolution::AlignedBuffer c1((int)s);
+  internal_convolution::AlignedBuffer c2((int)s);
+  run(std::integral_constant<int, m1>{}, c1.data);
+  run(std::integral_constant<int, m2>{}, c2.data);
+  run(std::integral_constant<int, m3>{}, ra.data);
 
   std::vector<long long> c((int)s);
   for (int i = 0; i < (int)s; ++i) {
-    unsigned long long r1 = c1[i];
-    unsigned long long r2 = c2[i];
-    unsigned long long r3 = c3[i];
+    unsigned long long r1 = c1.data[i];
+    unsigned long long r2 = c2.data[i];
+    unsigned long long r3 = ra.data[i];
 
     unsigned long long k2 =
         (r2 + (unsigned long long)m2 - r1 % (unsigned long long)m2) * inv12 %
