@@ -1,0 +1,36 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "very_small",
+      "generator": "random.cpp",
+      "args": ["10000", "0", "10000"]
+    },
+    {
+      "name": "small_many",
+      "generator": "random.cpp",
+      "args": ["20000", "0", "1000000"]
+    },
+    {
+      "name": "medium_32bit",
+      "generator": "random.cpp",
+      "args": ["300", "100000000", "4294967295"]
+    },
+    {
+      "name": "medium_64bit",
+      "generator": "random.cpp",
+      "args": ["200", "4294967296", "10000000000"]
+    },
+    {
+      "name": "large_single",
+      "generator": "random.cpp",
+      "args": ["1", "10000000000000", "10000000000000"]
+    },
+    {
+      "name": "squares_and_near",
+      "generator": "squares.cpp",
+      "args": ["300", "1", "100000"]
+    }
+  ]
+}
