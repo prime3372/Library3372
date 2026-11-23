@@ -1,0 +1,41 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_32",
+      "generator": "random.cpp",
+      "args": ["10000", "1", "2147483647", "0"]
+    },
+    {
+      "name": "random_64",
+      "generator": "random.cpp",
+      "args": ["10000", "1", "9223372036854775807", "0"]
+    },
+    {
+      "name": "random_odd_64",
+      "generator": "random.cpp",
+      "args": ["10000", "1", "9223372036854775807", "1"]
+    },
+    {
+      "name": "primes_32",
+      "generator": "primes.cpp",
+      "args": ["10000", "1000000000", "2147483647"]
+    },
+    {
+      "name": "primes_64",
+      "generator": "primes.cpp",
+      "args": ["10000", "4611686018427387904", "9223372036854775807"]
+    },
+    {
+      "name": "semiprimes_32",
+      "generator": "semiprimes.cpp",
+      "args": ["10000", "10000", "46340"]
+    },
+    {
+      "name": "semiprimes_64",
+      "generator": "semiprimes.cpp",
+      "args": ["1000", "1000000000", "3037000499"]
+    }
+  ]
+}
