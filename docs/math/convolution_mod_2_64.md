@@ -1,6 +1,6 @@
 # Convolution (mod 2^64)
 
-長さ $n$ と $m$ の整数列に対し、$2^{64}$ を法とする畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+$2^{64}$ を法とする畳み込みの結果を $O(n \log n)$ で求めます。
 
 ## convolution_mod_2_64
 
@@ -10,7 +10,7 @@ std::vector<T> convolution_mod_2_64(const std::vector<T>& a,
                                     const std::vector<T>& b);
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod 2^{64}$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 $a, b$ に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod 2^{64}$ として計算します。$a$ または $b$ が空の場合は空の `std::vector` を返します。
 
 ### 制約
 

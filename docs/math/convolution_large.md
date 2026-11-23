@@ -1,6 +1,6 @@
 # Convolution Large
 
-剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、$n + m - 1 \leq 2^{25}$ の範囲で畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+剰余環上の畳み込みを $O(n \log n)$ 計算する関数です。定数倍が悪化する代わりに、通常よりも数列の長さの制約が緩くなっています。
 
 ## convolution_large
 
@@ -25,7 +25,7 @@ std::vector<T> convolution_large(const std::vector<T>& a,
                                  const std::vector<T>& b);  // (4)
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 $a, b$ に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。$a$ または $b$ が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
@@ -48,6 +48,7 @@ std::vector<T> convolution_large(const std::vector<T>& a,
 
 int main() {
   using Mint = library3372::StaticModInt<1000000007>;
+
   std::vector<Mint> a = {1, 2, 3, 4};
   std::vector<Mint> b = {1, 2, 4};
   for (Mint x : library3372::convolution_large(a, b)) {

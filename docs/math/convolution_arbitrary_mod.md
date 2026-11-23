@@ -1,6 +1,6 @@
 # Convolution Arbitrary Mod
 
-剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+剰余環上の畳み込みを $O(n \log n)$ で計算する関数です。
 
 ## convolution_arbitrary_mod
 
@@ -25,7 +25,7 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b);  // (4)
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 $a, b$ に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。$a$ または $b$ が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
@@ -48,32 +48,15 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
 #include "library3372/math/static_modint.hpp"
 
 int main() {
-  using SMint = library3372::StaticModInt<1000000007>;
-  std::vector<SMint> a = {1, 2, 3, 4};
-  std::vector<SMint> b = {1, 2, 4};
+  using Mint = library3372::StaticModInt<1000000007>;
+
+  std::vector<Mint> a = {1, 2, 3, 4};
+  std::vector<Mint> b = {1, 2, 4};
   for (SMint x : library3372::convolution_arbitrary_mod(a, b)) {
     std::cout << x << " ";
   }
   std::cout << "\n";
   // 1 4 11 18 20 16
-
-  using DMint = library3372::DynamicModInt<0>;
-  DMint::set_mod(1000000000);
-  std::vector<DMint> da = {500000000, 500000000};
-  std::vector<DMint> db = {3, 4};
-  for (DMint x : library3372::convolution_arbitrary_mod(da, db)) {
-    std::cout << x << " ";
-  }
-  std::cout << "\n";
-  // 500000000 500000000 0
-
-  std::vector<int> ia = {100000, 200000};
-  std::vector<int> ib = {300000, 400000};
-  for (int x : library3372::convolution_arbitrary_mod(ia, ib, 1000000007)) {
-    std::cout << x << " ";
-  }
-  std::cout << "\n";
-  // 999999797 999999307 999999447
 
   return 0;
 }
