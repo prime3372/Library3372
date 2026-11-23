@@ -4,16 +4,17 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <utility>
 
 int main(int argc, char** argv) {
+  assert(argc >= 2);
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
-  (void)argc;
   int n = std::atoi(argv[1]);
 
   std::string a = "0";

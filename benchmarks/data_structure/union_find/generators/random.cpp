@@ -11,6 +11,9 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 3);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   int n = std::atoi(argv[1]);
   int q = std::atoi(argv[2]);
   assert(n >= 1 && q >= 1);
