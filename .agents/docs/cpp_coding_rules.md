@@ -28,6 +28,11 @@
 
 ## [クラス](https://google.github.io/styleguide/cppguide.html#classes)
 
+### [暗黙的型変換](https://google.github.io/styleguide/cppguide.html#Explicit_Constructors)
+
+- 2 個以上の引数をとるコンストラクタについても原則として `explicit` を必須とします。
+- 定数個のメンバ変数のラッパークラスについては、利便性の観点から暗黙的型変換を許容することがあります。
+
 ### [コピー可能・ムーブ可能な型](https://google.github.io/styleguide/cppguide.html#Copy_Constructors)
 
 - コピー操作・ムーブ操作・デストラクタをいずれもデフォルト定義するクラスでは、これらの宣言を省略してください。
