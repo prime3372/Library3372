@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "library3372/internal/math/montgomery.hpp"
+#include "library3372/math/factorize.hpp"
 #include "library3372/math/is_prime.hpp"
 
 namespace library3372::internal {
@@ -26,23 +27,12 @@ inline constexpr int ntt_naive_threshold = 60;
 
 constexpr int ntt_primitive_root(int m) {
   if (m == 2) return 1;
-  int divs[20] = {};
-  divs[0] = 2;
-  int cnt = 1;
-  int x = (m - 1) / 2;
-  while (x % 2 == 0) x /= 2;
-  for (int i = 3; (long long)i * i <= x; i += 2) {
-    if (x % i == 0) {
-      divs[cnt++] = i;
-      while (x % i == 0) x /= i;
-    }
-  }
-  if (x > 1) divs[cnt++] = x;
+  auto factors = factorize((long long)m - 1);
   for (int g = 2;; ++g) {
     bool ok = true;
-    for (int i = 0; i < cnt; ++i) {
+    for (const auto& [p, e] : factors) {
       long long base = g;
-      long long exp = (m - 1) / divs[i];
+      long long exp = (m - 1) / p;
       long long res = 1;
       while (exp > 0) {
         if (exp & 1) res = res * base % m;
@@ -1150,102 +1140,17 @@ void ntt_scale_out(const unsigned int* src, unsigned int* dst, int n,
 
 namespace internal_ntt64 {
 
-constexpr unsigned long long gcd_u64(unsigned long long a,
-                                     unsigned long long b) {
-  while (b != 0) {
-    unsigned long long t = a % b;
-    a = b;
-    b = t;
-  }
-  return a;
-}
-
-constexpr unsigned long long pollard_rho64(unsigned long long n) {
-  if ((n & 1ULL) == 0) return 2;
-  Montgomery64 mont(n);
-  for (unsigned long long c_val = 1;; ++c_val) {
-    unsigned long long c = mont.to_mont(c_val);
-    unsigned long long y = mont.to_mont(2);
-    unsigned long long q = mont.one();
-    unsigned long long g = 1;
-    unsigned long long r = 1;
-    unsigned long long x = y;
-    while (g == 1) {
-      x = y;
-      for (unsigned long long i = 0; i < r; ++i) {
-        y = mont.add(mont.mul(y, y), c);
-      }
-      unsigned long long k = 0;
-      while (k < r && g == 1) {
-        unsigned long long ys = y;
-        unsigned long long lim = (r - k < 128 ? r - k : 128);
-        for (unsigned long long i = 0; i < lim; ++i) {
-          y = mont.add(mont.mul(y, y), c);
-          unsigned long long diff = x > y ? x - y : y - x;
-          q = mont.mul(q, diff);
-        }
-        g = gcd_u64(mont.from_mont(q), n);
-        k += lim;
-        if (g == n) {
-          y = ys;
-          do {
-            y = mont.add(mont.mul(y, y), c);
-            unsigned long long diff = x > y ? x - y : y - x;
-            g = gcd_u64(mont.from_mont(diff), n);
-          } while (g == 1);
-          break;
-        }
-      }
-      r <<= 1;
-    }
-    if (g > 1 && g < n) return g;
-  }
-}
-
-constexpr void add_unique_factor(unsigned long long p, unsigned long long* divs,
-                                 int& cnt) {
-  for (int i = 0; i < cnt; ++i) {
-    if (divs[i] == p) return;
-  }
-  divs[cnt++] = p;
-}
-
-constexpr void factorize64(unsigned long long n, unsigned long long* divs,
-                           int& cnt) {
-  if (n <= 1) return;
-  if (is_prime((long long)n)) {
-    add_unique_factor(n, divs, cnt);
-    return;
-  }
-  unsigned long long d = pollard_rho64(n);
-  factorize64(d, divs, cnt);
-  factorize64(n / d, divs, cnt);
-}
-
 constexpr unsigned long long ntt_primitive_root64(long long m) {
   if (m == 2) return 1;
-  unsigned long long divs[64] = {};
-  int cnt = 0;
-  unsigned long long x = (unsigned long long)m - 1ULL;
-  if ((x & 1ULL) == 0) {
-    add_unique_factor(2ULL, divs, cnt);
-    while ((x & 1ULL) == 0) x >>= 1;
-  }
-  for (unsigned long long i = 3; i <= 9999ULL && i * i <= x; i += 2) {
-    if (x % i == 0) {
-      add_unique_factor(i, divs, cnt);
-      while (x % i == 0) x /= i;
-    }
-  }
-  if (x > 1) factorize64(x, divs, cnt);
-
+  auto factors = factorize(m - 1);
   Montgomery64 mont((unsigned long long)m);
   unsigned long long one = mont.one();
   for (unsigned long long g = 2;; ++g) {
     unsigned long long gm = mont.to_mont(g);
     bool ok = true;
-    for (int i = 0; i < cnt; ++i) {
-      if (mont.pow(gm, ((unsigned long long)m - 1ULL) / divs[i]) == one) {
+    for (const auto& [p, e] : factors) {
+      if (mont.pow(gm, ((unsigned long long)m - 1ULL) /
+                           (unsigned long long)p) == one) {
         ok = false;
         break;
       }
