@@ -1,0 +1,26 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "small",
+      "generator": "random.cpp",
+      "args": ["60", "60"]
+    },
+    {
+      "name": "medium",
+      "generator": "random.cpp",
+      "args": ["16384", "16384"]
+    },
+    {
+      "name": "large_500k",
+      "generator": "random.cpp",
+      "args": ["500000", "500000"]
+    },
+    {
+      "name": "xlarge_2m",
+      "generator": "random.cpp",
+      "args": ["2000000", "2000000"]
+    }
+  ]
+}
