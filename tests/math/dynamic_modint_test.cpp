@@ -19,13 +19,17 @@ namespace {
 using library3372::DynamicModInt;
 
 template <typename Mint, typename T> void check_integer_type() {
-  static_assert(!std::is_convertible_v<T, Mint>);
-  static_assert(!std::is_assignable_v<Mint&, T>);
+  static_assert(std::is_convertible_v<T, Mint>);
+  static_assert(std::is_assignable_v<Mint&, T>);
   static_assert(std::is_constructible_v<Mint, T>);
 
   int m = Mint::mod();
-  Mint a(5);
+  Mint a = 5;
   T x = (T)7;
+  Mint c = x;
+  assert(c == Mint(x));
+  c = (T)3;
+  assert(c == Mint((T)3));
 
   assert((a + x) == (a + Mint(x)));
   assert((x + a) == (Mint(x) + a));
@@ -259,10 +263,12 @@ void test_type_constraints() {
   static_assert(std::is_constructible_v<Mint, bool>);
   static_assert(std::is_constructible_v<Mint, char>);
   static_assert(!std::is_constructible_v<Mint, double>);
-  static_assert(!std::is_convertible_v<int, Mint>);
-  static_assert(!std::is_convertible_v<long long, Mint>);
-  static_assert(!std::is_assignable_v<Mint&, int>);
-  static_assert(!std::is_assignable_v<Mint&, long long>);
+  static_assert(!std::is_convertible_v<double, Mint>);
+  static_assert(!std::is_assignable_v<Mint&, double>);
+  static_assert(std::is_convertible_v<int, Mint>);
+  static_assert(std::is_convertible_v<long long, Mint>);
+  static_assert(std::is_assignable_v<Mint&, int>);
+  static_assert(std::is_assignable_v<Mint&, long long>);
 }
 
 }  // namespace

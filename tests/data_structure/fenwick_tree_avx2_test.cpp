@@ -101,23 +101,22 @@ template <typename T> void test_float_type() {
 void test_modint_and_custom_struct(std::mt19937_64& rng) {
   {
     using Mint = StaticModInt<998244353>;
-    std::vector<Mint> vm = {Mint(-1), Mint(998244353LL + 7),
-                            Mint(1000000000000LL)};
+    std::vector<Mint> vm = {-1, 998244353LL + 7, 1000000000000LL};
     FenwickTree<Mint> fw_mint(vm);
     assert(fw_mint.size() == 3);
-    assert(fw_mint.sum(0, 1) == Mint(-1));
-    assert(fw_mint.sum(1, 2) == Mint(7));
-    assert(fw_mint.sum(0, 3) == Mint(-1) + Mint(7) + Mint(1000000000000LL));
+    assert(fw_mint.sum(0, 1) == -1);
+    assert(fw_mint.sum(1, 2) == 7);
+    assert(fw_mint.sum(0, 3) == Mint(-1) + 7 + 1000000000000LL);
 
     int n = 25;
     std::uniform_int_distribution<int> vdist(0, 998244352);
     std::vector<Mint> init(n);
-    for (int i = 0; i < n; ++i) init[i] = Mint(vdist(rng));
+    for (int i = 0; i < n; ++i) init[i] = vdist(rng);
     FenwickTree<Mint> fw(init);
     NaiveFenwickTree<Mint> naive(init);
     for (int step = 0; step < 50; ++step) {
       int p = (int)(rng() % (unsigned)n);
-      Mint x(vdist(rng));
+      Mint x = vdist(rng);
       if (step % 2 == 0) {
         fw.add(p, x);
         naive.add(p, x);
@@ -131,8 +130,8 @@ void test_modint_and_custom_struct(std::mt19937_64& rng) {
   {
     using Mint1 = StaticModInt<1>;
     FenwickTree<Mint1> fw(5);
-    fw.add(2, Mint1(10));
-    assert(fw.sum(0, 5) == Mint1(0));
+    fw.add(2, 10);
+    assert(fw.sum(0, 5) == 0);
   }
   {
     FenwickTree<Vec2> fw0(0);

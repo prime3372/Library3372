@@ -25,7 +25,7 @@ StaticModInt::StaticModInt(T v);  // (2)
 ```
 
 - (1): 値 $0$ で初期化します。
-- (2): 整数 $v$ を $m$ で割った余りで初期化します。暗黙構築はできないので注意してください。
+- (2): 整数 $v$ を $m$ で割った余りで初期化します。
 
 ### 制約
 
@@ -144,17 +144,10 @@ StaticModInt StaticModInt::operator--(int);  // (2)
 ## operator+=
 
 ```cpp
-StaticModInt& StaticModInt::operator+=(StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt& StaticModInt::operator+=(T rhs);  // (2)
+StaticModInt& StaticModInt::operator+=(StaticModInt rhs);
 ```
 
 `rhs` を加算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -163,17 +156,10 @@ StaticModInt& StaticModInt::operator+=(T rhs);  // (2)
 ## operator-=
 
 ```cpp
-StaticModInt& StaticModInt::operator-=(StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt& StaticModInt::operator-=(T rhs);  // (2)
+StaticModInt& StaticModInt::operator-=(StaticModInt rhs);
 ```
 
 `rhs` を減算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -182,17 +168,10 @@ StaticModInt& StaticModInt::operator-=(T rhs);  // (2)
 ## operator\*=
 
 ```cpp
-StaticModInt& StaticModInt::operator*=(StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt& StaticModInt::operator*=(T rhs);  // (2)
+StaticModInt& StaticModInt::operator*=(StaticModInt rhs);
 ```
 
 `rhs` を乗算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -201,19 +180,14 @@ StaticModInt& StaticModInt::operator*=(T rhs);  // (2)
 ## operator/=
 
 ```cpp
-StaticModInt& StaticModInt::operator/=(StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt& StaticModInt::operator/=(T rhs);  // (2)
+StaticModInt& StaticModInt::operator/=(StaticModInt rhs);
 ```
 
 `rhs` で除算します。
 
 ### 制約
 
-- (1): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
-- (2): `T` は整数型
-- (2): $\gcd(\mathrm{StaticModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
+- $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
 
 ### 計算量
 
@@ -225,20 +199,10 @@ StaticModInt& StaticModInt::operator/=(T rhs);  // (2)
 StaticModInt StaticModInt::operator+() const;  // (1)
 
 StaticModInt operator+(StaticModInt lhs, StaticModInt rhs);  // (2)
-
-template <typename T>
-StaticModInt operator+(StaticModInt lhs, T rhs);  // (3)
-
-template <typename T>
-StaticModInt operator+(T lhs, StaticModInt rhs);  // (4)
 ```
 
 - (1): 自身の値をそのまま返します。
-- (2), (3), (4): `lhs` と `rhs` の和を返します。
-
-### 制約
-
-- (3), (4): `T` は整数型
+- (2): `lhs` と `rhs` の和を返します。
 
 ### 計算量
 
@@ -250,20 +214,10 @@ StaticModInt operator+(T lhs, StaticModInt rhs);  // (4)
 StaticModInt StaticModInt::operator-() const;  // (1)
 
 StaticModInt operator-(StaticModInt lhs, StaticModInt rhs);  // (2)
-
-template <typename T>
-StaticModInt operator-(StaticModInt lhs, T rhs);  // (3)
-
-template <typename T>
-StaticModInt operator-(T lhs, StaticModInt rhs);  // (4)
 ```
 
 - (1): 加法逆元を返します。
-- (2), (3), (4): `lhs` と `rhs` の差を返します。
-
-### 制約
-
-- (3), (4): `T` は整数型
+- (2): `lhs` と `rhs` の差を返します。
 
 ### 計算量
 
@@ -272,20 +226,10 @@ StaticModInt operator-(T lhs, StaticModInt rhs);  // (4)
 ## operator\*
 
 ```cpp
-StaticModInt operator*(StaticModInt lhs, StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt operator*(StaticModInt lhs, T rhs);  // (2)
-
-template <typename T>
-StaticModInt operator*(T lhs, StaticModInt rhs);  // (3)
+StaticModInt operator*(StaticModInt lhs, StaticModInt rhs);
 ```
 
 `lhs` と `rhs` の積を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -294,22 +238,14 @@ StaticModInt operator*(T lhs, StaticModInt rhs);  // (3)
 ## operator/
 
 ```cpp
-StaticModInt operator/(StaticModInt lhs, StaticModInt rhs);  // (1)
-
-template <typename T>
-StaticModInt operator/(StaticModInt lhs, T rhs);  // (2)
-
-template <typename T>
-StaticModInt operator/(T lhs, StaticModInt rhs);  // (3)
+StaticModInt operator/(StaticModInt lhs, StaticModInt rhs);
 ```
 
 `lhs` を `rhs` で割った商を返します。
 
 ### 制約
 
-- (1), (3): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
-- (2): $\gcd(\mathrm{StaticModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
-- (2), (3): `T` は整数型
+- $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
 
 ### 計算量
 
@@ -318,20 +254,10 @@ StaticModInt operator/(T lhs, StaticModInt rhs);  // (3)
 ## operator==
 
 ```cpp
-bool operator==(StaticModInt lhs, StaticModInt rhs);  // (1)
-
-template <typename T>
-bool operator==(StaticModInt lhs, T rhs);  // (2)
-
-template <typename T>
-bool operator==(T lhs, StaticModInt rhs);  // (3)
+bool operator==(StaticModInt lhs, StaticModInt rhs);
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同であれば `true` を、そうでなければ `false` を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -340,20 +266,10 @@ bool operator==(T lhs, StaticModInt rhs);  // (3)
 ## operator!=
 
 ```cpp
-bool operator!=(StaticModInt lhs, StaticModInt rhs);  // (1)
-
-template <typename T>
-bool operator!=(StaticModInt lhs, T rhs);  // (2)
-
-template <typename T>
-bool operator!=(T lhs, StaticModInt rhs);  // (3)
+bool operator!=(StaticModInt lhs, StaticModInt rhs);
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同でなければ `true` を、そうでなければ `false` を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -399,7 +315,7 @@ std::istream& operator>>(std::istream& is, StaticModInt& x);
 int main() {
   using Mint = library3372::StaticModInt<998244353>;
 
-  Mint a(10);
+  Mint a = 10;
   Mint b = Mint::raw(3);
 
   std::cout << a + b << "\n";      // 13

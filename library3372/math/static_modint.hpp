@@ -36,7 +36,7 @@ template <int m> class StaticModInt {
 
   template <typename T>
     requires internal::is_signed_integer_v<T>
-  constexpr explicit StaticModInt(T v) {
+  constexpr StaticModInt(T v) {
     if constexpr (sizeof(T) <= sizeof(int)) {
       int x = (int)v % m;
       if (x < 0) x += m;
@@ -54,7 +54,7 @@ template <int m> class StaticModInt {
 
   template <typename T>
     requires internal::is_unsigned_integer_v<T>
-  constexpr explicit StaticModInt(T v) {
+  constexpr StaticModInt(T v) {
     if constexpr (sizeof(T) <= sizeof(unsigned int)) {
       val_ = (unsigned int)v % (unsigned int)m;
     } else if constexpr (sizeof(T) <= sizeof(unsigned long long)) {
@@ -69,7 +69,7 @@ template <int m> class StaticModInt {
   constexpr StaticModInt pow(long long n) const {
     assert(n >= 0);
     StaticModInt x = *this;
-    StaticModInt res(1);
+    StaticModInt res = 1;
     while (n > 0) {
       if (n & 1) res *= x;
       x *= x;
@@ -149,30 +149,6 @@ template <int m> class StaticModInt {
     return *this *= rhs.inv();
   }
 
-  template <typename T>
-    requires internal::is_integer_v<T>
-  constexpr StaticModInt& operator+=(T rhs) {
-    return *this += StaticModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  constexpr StaticModInt& operator-=(T rhs) {
-    return *this -= StaticModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  constexpr StaticModInt& operator*=(T rhs) {
-    return *this *= StaticModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  constexpr StaticModInt& operator/=(T rhs) {
-    return *this /= StaticModInt(rhs);
-  }
-
   friend constexpr StaticModInt operator+(StaticModInt lhs, StaticModInt rhs) {
     return lhs += rhs;
   }
@@ -189,62 +165,8 @@ template <int m> class StaticModInt {
     return lhs /= rhs;
   }
 
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator+(StaticModInt lhs, T rhs) {
-    return lhs += rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator+(T lhs, StaticModInt rhs) {
-    return StaticModInt(lhs) += rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator-(StaticModInt lhs, T rhs) {
-    return lhs -= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator-(T lhs, StaticModInt rhs) {
-    return StaticModInt(lhs) -= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator*(StaticModInt lhs, T rhs) {
-    return lhs *= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator*(T lhs, StaticModInt rhs) {
-    return StaticModInt(lhs) *= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator/(StaticModInt lhs, T rhs) {
-    return lhs /= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr StaticModInt operator/(T lhs, StaticModInt rhs) {
-    return StaticModInt(lhs) /= rhs;
-  }
-
   friend constexpr bool operator==(StaticModInt lhs, StaticModInt rhs) {
     return lhs.val_ == rhs.val_;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend constexpr bool operator==(StaticModInt lhs, T rhs) {
-    return lhs == StaticModInt(rhs);
   }
 
   friend std::ostream& operator<<(std::ostream& os, StaticModInt x) {
@@ -262,14 +184,14 @@ template <int m> class StaticModInt {
       [[maybe_unused]] std::from_chars_result res =
           std::from_chars(begin, end, v);
       assert(res.ec == std::errc() && res.ptr == end);
-      x = StaticModInt(v);
+      x = v;
     } else {
       if (s[0] == '+') ++begin;
       unsigned long long v = 0;
       [[maybe_unused]] std::from_chars_result res =
           std::from_chars(begin, end, v);
       assert(res.ec == std::errc() && res.ptr == end);
-      x = StaticModInt(v);
+      x = v;
     }
     return is;
   }

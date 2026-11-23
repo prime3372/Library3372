@@ -41,8 +41,8 @@ std::vector<T> convolution(const std::vector<T>& a,
 int main() {
   using Mint = library3372::StaticModInt<998244353>;
 
-  std::vector<Mint> a = {Mint(1), Mint(2), Mint(3), Mint(4)};
-  std::vector<Mint> b = {Mint(1), Mint(2), Mint(4)};
+  std::vector<Mint> a = {1, 2, 3, 4};
+  std::vector<Mint> b = {1, 2, 4};
   std::vector<Mint> c = library3372::convolution(a, b);
   for (Mint x : c) std::cout << x << " ";
   std::cout << "\n";

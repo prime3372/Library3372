@@ -133,20 +133,18 @@ inline void test_empty_and_small() {
   using SMint = StaticModInt<1000000007>;
   assert(convolution_arbitrary_mod(std::vector<SMint>{}, std::vector<SMint>{})
              .empty());
-  assert(convolution_arbitrary_mod(std::vector<SMint>{SMint(1)},
-                                   std::vector<SMint>{})
+  assert(convolution_arbitrary_mod(std::vector<SMint>{1}, std::vector<SMint>{})
              .empty());
-  assert(convolution_arbitrary_mod(std::vector<SMint>{},
-                                   std::vector<SMint>{SMint(2)})
+  assert(convolution_arbitrary_mod(std::vector<SMint>{}, std::vector<SMint>{2})
              .empty());
 
   using DMint = DynamicModInt<0>;
   DMint::set_mod(1000000000);
   assert(convolution_arbitrary_mod(std::vector<DMint>{}, std::vector<DMint>{})
              .empty());
-  assert(convolution_arbitrary_mod(std::vector<DMint>{DMint(1)},
-                                   std::vector<DMint>{DMint(2)}) ==
-         std::vector<DMint>{DMint(2)});
+  assert(
+      convolution_arbitrary_mod(std::vector<DMint>{1}, std::vector<DMint>{2}) ==
+      std::vector<DMint>{2});
 
   assert(convolution_arbitrary_mod(std::vector<int>{}, std::vector<int>{}, 12)
              .empty());
@@ -155,9 +153,8 @@ inline void test_empty_and_small() {
 
   // mod = 1
   using Mint1 = StaticModInt<1>;
-  std::vector<Mint1> m1_a(100, Mint1(0)), m1_b(120, Mint1(0));
-  assert(convolution_arbitrary_mod(m1_a, m1_b) ==
-         std::vector<Mint1>(219, Mint1(0)));
+  std::vector<Mint1> m1_a(100, 0), m1_b(120, 0);
+  assert(convolution_arbitrary_mod(m1_a, m1_b) == std::vector<Mint1>(219, 0));
   std::vector<int> i1_a(100, 123), i1_b(120, -456);
   assert(convolution_arbitrary_mod(i1_a, i1_b, 1) == std::vector<int>(219, 0));
 
