@@ -1,6 +1,6 @@
 # Convolution
 
-2 つの数列の剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m) + \log \mathrm{mod})$ で求めます。
+剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の整数列に対し、畳み込みの結果を $O((n + m) \log (n + m) + \log \mathrm{mod})$ で求めます。法は NTT-friendly な素数でなければいけません。
 
 ## convolution
 
@@ -15,14 +15,14 @@ std::vector<T> convolution(const std::vector<T>& a,
                            const std::vector<T>& b);  // (2)
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算し、返します。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
 - $2 \leq m \leq 2 \times 10^9$
 - $m$ は素数
 - $2^c \mid (m - 1)$ かつ $|a| + |b| - 1 \leq 2^c$ を満たす整数 $c$ が存在する
-- (2): $T$ は整数型
+- (2): `T` は整数型
 
 ### 計算量
 

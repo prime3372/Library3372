@@ -1,6 +1,6 @@
 # Convolution Arbitrary Mod
 
-任意の法による 2 つの数列の剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
+剰余環上の畳み込みを計算する関数です。長さ $n$ と $m$ の数列に対し、畳み込みの結果を $O((n + m) \log (n + m))$ で求めます。
 
 ## convolution_arbitrary_mod
 
@@ -25,7 +25,7 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b);  // (4)
 ```
 
-数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod M$ として計算し、返します。ここで、法 $M$ は (1), (4) では $m$、(2) では `DynamicModInt<id>::mod()`、(3) では `mod` です。`a` または `b` が空の場合は空の `std::vector` を返します。
+数列 `a` と `b` に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。`a` または `b` が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
