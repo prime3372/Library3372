@@ -25,7 +25,26 @@ struct Cpx {
   }
 };
 
-void fft_ld(std::vector<Cpx>& a, bool invert) {
+std::vector<Cpx> build_roots(int n) {
+  std::vector<Cpx> roots(n);
+  roots[0] = {1.0L, 0.0L};
+  if (n <= 1) return roots;
+  static const long double kPi = std::acos(-1.0L);
+  int top = n >> 1;
+  long double ang = kPi / (long double)top;
+  for (int j = 0; j < top; ++j) {
+    long double theta = ang * (long double)j;
+    roots[top + j] = {std::cos(theta), std::sin(theta)};
+  }
+  for (int half = top >> 1; half >= 1; half >>= 1) {
+    for (int j = 0; j < half; ++j) {
+      roots[half + j] = roots[(half << 1) + (j << 1)];
+    }
+  }
+  return roots;
+}
+
+void fft_ld(std::vector<Cpx>& a, const std::vector<Cpx>& roots, bool invert) {
   int n = (int)a.size();
   for (int i = 1, j = 0; i < n; ++i) {
     int bit = n >> 1;
@@ -34,23 +53,14 @@ void fft_ld(std::vector<Cpx>& a, bool invert) {
     if (i < j) std::swap(a[i], a[j]);
   }
 
-  static const long double kPi = std::acos(-1.0L);
-  std::vector<Cpx> roots(n);
-  roots[0] = {1.0L, 0.0L};
-  for (int half = 1; half < n; half <<= 1) {
-    long double ang = (invert ? -kPi : kPi) / (long double)half;
-    for (int j = 0; j < half; ++j) {
-      roots[half + j] = {std::cos(ang * (long double)j),
-                         std::sin(ang * (long double)j)};
-    }
-  }
-
   for (int half = 1; half < n; half <<= 1) {
     int len = half << 1;
     for (int i = 0; i < n; i += len) {
       for (int j = 0; j < half; ++j) {
+        Cpx w = roots[half + j];
+        if (invert) w.y = -w.y;
         Cpx u = a[i + j];
-        Cpx v = a[i + j + half] * roots[half + j];
+        Cpx v = a[i + j + half] * w;
         a[i + j] = u + v;
         a[i + j + half] = u - v;
       }
@@ -82,8 +92,9 @@ int main() {
     fb[i] = {(long double)(b[i] & 32767U), (long double)(b[i] >> 15)};
   }
 
-  fft_ld(fa, false);
-  fft_ld(fb, false);
+  std::vector<Cpx> roots = build_roots(z);
+  fft_ld(fa, roots, false);
+  fft_ld(fb, roots, false);
 
   long double ratio = 0.5L / (long double)z;
   std::vector<Cpx> r(z), t(z);
@@ -97,8 +108,8 @@ int main() {
     t[i] = da1 * fb[i];
   }
 
-  fft_ld(r, true);
-  fft_ld(t, true);
+  fft_ld(r, roots, true);
+  fft_ld(t, roots, true);
 
   constexpr unsigned long long kOutMod = 1000000007ULL;
   std::vector<unsigned int> c(s);
