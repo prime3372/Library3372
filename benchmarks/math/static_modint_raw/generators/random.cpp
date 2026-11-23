@@ -4,12 +4,16 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <random>
 
 int main(int argc, char* argv[]) {
-  if (argc < 3) return 1;
+  assert(argc >= 3);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   int n = std::atoi(argv[1]);
   int k = std::atoi(argv[2]);
 

@@ -11,6 +11,9 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   int l = std::atoi(argv[1]);
   int r = std::atoi(argv[2]);
   int m = std::atoi(argv[3]);

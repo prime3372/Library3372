@@ -21,6 +21,9 @@ struct RawEdge {
 
 int main(int argc, char* argv[]) {
   assert(argc >= 6);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   int b = std::atoi(argv[1]);
   int l = std::atoi(argv[2]);
   int k1 = std::atoi(argv[3]);

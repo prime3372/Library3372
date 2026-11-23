@@ -11,6 +11,9 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   int n = std::atoi(argv[1]);
   int m = std::atoi(argv[2]);
   long long max_cap = std::atoll(argv[3]);

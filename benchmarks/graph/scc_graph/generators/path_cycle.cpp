@@ -5,6 +5,7 @@
 // License: CC0 1.0 Universal
 
 #include <algorithm>
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <numeric>
@@ -13,6 +14,7 @@
 #include <vector>
 
 int main(int argc, char** argv) {
+  assert(argc >= 3);
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
