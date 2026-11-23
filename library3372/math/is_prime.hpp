@@ -17,13 +17,10 @@ namespace library3372 {
 // https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test
 constexpr bool is_prime(long long n) {
   if (n <= 1) return false;
-  if (n == 2 || n == 3 || n == 5 || n == 7 || n == 11 || n == 13) return true;
-  const unsigned long long u = (unsigned long long)n;
-  if ((u & 1ULL) == 0 || u % 3 == 0 || u % 5 == 0 || u % 7 == 0 ||
-      u % 11 == 0 || u % 13 == 0) {
-    return false;
-  }
+  if (n <= 3) return true;
 
+  const unsigned long long u = (unsigned long long)n;
+  if ((u & 1ULL) == 0) return false;
   unsigned long long d = u - 1;
   const int s = std::countr_zero(d);
   d >>= s;
