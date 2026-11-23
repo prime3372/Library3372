@@ -19,23 +19,15 @@
 #include <utility>
 #include <vector>
 
+#include "library3372/internal/math/montgomery.hpp"
 #include "library3372/internal/type_traits/is_integer.hpp"
+#include "library3372/math/is_prime.hpp"
 #include "library3372/math/static_modint.hpp"
 
 namespace library3372 {
 namespace internal_convolution {
 
 inline constexpr int naive_threshold = 60;
-
-constexpr bool is_prime_constexpr(int n) {
-  if (n < 2) return false;
-  if (n == 2 || n == 3) return true;
-  if (n % 2 == 0 || n % 3 == 0) return false;
-  for (long long i = 5; i * i <= n; i += 6) {
-    if (n % i == 0 || n % (i + 2) == 0) return false;
-  }
-  return true;
-}
 
 constexpr int primitive_root_constexpr(int m) {
   if (m == 2) return 1;
@@ -71,61 +63,12 @@ constexpr int primitive_root_constexpr(int m) {
   }
 }
 
-// 32-bit Montgomery arithmetic for odd modulus 3 <= m < 2^31
-// https://en.wikipedia.org/wiki/Montgomery_modular_multiplication
-struct Montgomery32 {
-  unsigned int mod;
-  unsigned int mod2;
-  unsigned int inv;
-  unsigned int one;
-  unsigned int r2;
-
-  explicit constexpr Montgomery32(unsigned int m)
-      : mod(m),
-        mod2(m * 2U),
-        inv(m),
-        one((unsigned int)((1ULL << 32) % m)),
-        r2((unsigned int)((((unsigned __int128)1) << 64) % m)) {
-    for (int i = 0; i < 5; ++i) inv *= 2U - mod * inv;
-    inv = 0U - inv;
-  }
-
-  constexpr unsigned int reduce_2m(unsigned long long t) const {
-    unsigned int q = (unsigned int)t * inv;
-    return (unsigned int)((t + (unsigned long long)q * mod) >> 32);
-  }
-
-  constexpr unsigned int reduce(unsigned long long t) const {
-    unsigned int u = reduce_2m(t);
-    return u >= mod ? u - mod : u;
-  }
-
-  constexpr unsigned int mul(unsigned int a, unsigned int b) const {
-    return reduce((unsigned long long)a * b);
-  }
-
-  constexpr unsigned int mul_2m(unsigned int a, unsigned int b) const {
-    return reduce_2m((unsigned long long)a * b);
-  }
-
-  constexpr unsigned int pow(unsigned int base_mont,
-                             unsigned long long exp) const {
-    unsigned int res = one;
-    while (exp > 0) {
-      if (exp & 1ULL) res = mul(res, base_mont);
-      base_mont = mul(base_mont, base_mont);
-      exp >>= 1;
-    }
-    return res;
-  }
-};
-
 template <int m> struct NttInfo {
-  static constexpr bool valid = (m >= 2 && is_prime_constexpr(m));
+  static constexpr bool valid = (m >= 2 && is_prime(m));
   static constexpr unsigned int mod = (unsigned int)(valid ? m : 3);
   static constexpr bool lazy = (mod < (1U << 30));
   static constexpr int rank2 = std::countr_zero(mod - 1);
-  static constexpr Montgomery32 mont{mod};
+  static constexpr internal::Montgomery32 mont{mod == 2 ? 3U : mod};
 
   unsigned int imag = 0;
   unsigned int iimag = 0;
@@ -141,7 +84,7 @@ template <int m> struct NttInfo {
   constexpr NttInfo() {
     if constexpr (!valid || mod == 2) return;
     int g = primitive_root_constexpr((int)mod);
-    unsigned int g_mont = mont.mul((unsigned int)g, mont.r2);
+    unsigned int g_mont = mont.to_mont((unsigned int)g);
 
     unsigned int root[32] = {};
     unsigned int iroot[32] = {};
@@ -158,8 +101,8 @@ template <int m> struct NttInfo {
     }
 
     for (int d = 0; d < 13; ++d) {
-      unsigned int prod = mont.one;
-      unsigned int iprod = mont.one;
+      unsigned int prod = mont.one();
+      unsigned int iprod = mont.one();
       for (int k = 0; k + d <= rank2 - 2; ++k) {
         step[d][k] = mont.mul(root[k + d + 2], prod);
         istep[d][k] = mont.mul(iroot[k + d + 2], iprod);
@@ -177,11 +120,11 @@ template <int m> struct NttInfo {
       unsigned int e12 = mont.mul(e1, e2);
       unsigned int e012 = mont.mul(e01, e2);
 
-      for (int i = 0; i < 4; ++i) w4_init[i] = mont.one;
+      for (int i = 0; i < 4; ++i) w4_init[i] = mont.one();
       for (int i = 4; i < 8; ++i) w4_init[i] = e0;
 
-      w2_init[0] = mont.one;
-      w2_init[1] = mont.one;
+      w2_init[0] = mont.one();
+      w2_init[1] = mont.one();
       w2_init[2] = e0;
       w2_init[3] = e0;
       w2_init[4] = e1;
@@ -189,7 +132,7 @@ template <int m> struct NttInfo {
       w2_init[6] = e01;
       w2_init[7] = e01;
 
-      w1_init[0] = mont.one;
+      w1_init[0] = mont.one();
       w1_init[1] = e1;
       w1_init[2] = e0;
       w1_init[3] = e01;
@@ -206,11 +149,11 @@ template <int m> struct NttInfo {
       unsigned int ie12 = mont.mul(ie1, ie2);
       unsigned int ie012 = mont.mul(ie01, ie2);
 
-      for (int i = 0; i < 4; ++i) iw4_init[i] = mont.one;
+      for (int i = 0; i < 4; ++i) iw4_init[i] = mont.one();
       for (int i = 4; i < 8; ++i) iw4_init[i] = ie0;
 
-      iw2_init[0] = mont.one;
-      iw2_init[1] = mont.one;
+      iw2_init[0] = mont.one();
+      iw2_init[1] = mont.one();
       iw2_init[2] = ie0;
       iw2_init[3] = ie0;
       iw2_init[4] = ie1;
@@ -218,7 +161,7 @@ template <int m> struct NttInfo {
       iw2_init[6] = ie01;
       iw2_init[7] = ie01;
 
-      iw1_init[0] = mont.one;
+      iw1_init[0] = mont.one();
       iw1_init[1] = ie1;
       iw1_init[2] = ie0;
       iw1_init[3] = ie01;
@@ -275,7 +218,7 @@ inline unsigned int sub_lim_scalar(unsigned int a, unsigned int b,
 
 template <bool Lazy>
 inline unsigned int mont_mul_scalar(unsigned int a, unsigned int b,
-                                    const Montgomery32& mont) {
+                                    const internal::Montgomery32& mont) {
   if constexpr (Lazy) return mont.mul_2m(a, b);
   return mont.mul(a, b);
 }
@@ -291,7 +234,7 @@ struct Avx2MontConsts {
     return {
         _mm256_set1_epi32((int)m),
         _mm256_set1_epi32((int)limit),
-        _mm256_set1_epi32((int)Montgomery32(m).inv),
+        _mm256_set1_epi32((int)internal::Montgomery32(m).neg_inv()),
     };
   }
 };
@@ -603,7 +546,7 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
     }
     for (int len = start_len; len >= 1; len >>= 1) {
       int blocks = n / (len << 1);
-      unsigned int rot = info.mont.one;
+      unsigned int rot = info.mont.one();
       for (int s = 0; s < blocks; ++s) {
         int off = s * (len << 1);
         for (int i = 0; i < len; ++i) {
@@ -661,19 +604,19 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
 
   if (h <= 13) {
     for (; h > 5; h -= 2) {
-      radix4_stage_fwd<m>(a, n, h, info.mont.one, c, vimag);
+      radix4_stage_fwd<m>(a, n, h, info.mont.one(), c, vimag);
     }
-    if (h == 5) radix4_stage_fwd<m, 8>(a, n, 5, info.mont.one, c, vimag);
+    if (h == 5) radix4_stage_fwd<m, 8>(a, n, 5, info.mont.one(), c, vimag);
     last3_fwd<m>(a, n >> 4, w4, w2, w1, c);
     return;
   }
 
   for (; h > 13; h -= 2) {
-    radix4_stage_fwd<m>(a, n, h, info.mont.one, c, vimag);
+    radix4_stage_fwd<m>(a, n, h, info.mont.one(), c, vimag);
   }
 
-  unsigned int w_init[5] = {info.mont.one, info.mont.one, info.mont.one,
-                            info.mont.one, info.mont.one};
+  unsigned int w_init[5] = {info.mont.one(), info.mont.one(), info.mont.one(),
+                            info.mont.one(), info.mont.one()};
   int s_end = n >> 13;
   for (int s = 0; s < s_end; ++s) {
     unsigned int* blk = a + (s << 13);
@@ -711,7 +654,7 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   if (n < 16) {
     for (int len = 1; len < n; len <<= 1) {
       int blocks = n / (len << 1);
-      unsigned int irot = info.mont.one;
+      unsigned int irot = info.mont.one();
       for (int s = 0; s < blocks; ++s) {
         int off = s * (len << 1);
         for (int i = 0; i < len; ++i) {
@@ -740,11 +683,11 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
     last3_inv<m>(a, n >> 4, iw4, iw2, iw1, c);
     int h = 5;
     if (h <= log_n) {
-      radix4_stage_inv<m, 8>(a, n, 5, info.mont.one, c, viimag);
+      radix4_stage_inv<m, 8>(a, n, 5, info.mont.one(), c, viimag);
       h = 7;
     }
     for (; h <= log_n; h += 2) {
-      radix4_stage_inv<m>(a, n, h, info.mont.one, c, viimag);
+      radix4_stage_inv<m>(a, n, h, info.mont.one(), c, viimag);
     }
     if (h - 1 == log_n) {
       int p = n >> 1;
@@ -758,8 +701,8 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
     return;
   }
 
-  unsigned int iw_init[5] = {info.mont.one, info.mont.one, info.mont.one,
-                             info.mont.one, info.mont.one};
+  unsigned int iw_init[5] = {info.mont.one(), info.mont.one(), info.mont.one(),
+                             info.mont.one(), info.mont.one()};
   int s_end = n >> 13;
   for (int s = 0; s < s_end; ++s) {
     unsigned int* blk = a + (s << 13);
@@ -792,7 +735,7 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
 
   int h = 15;
   for (; h <= log_n; h += 2) {
-    radix4_stage_inv<m>(a, n, h, info.mont.one, c, viimag);
+    radix4_stage_inv<m>(a, n, h, info.mont.one(), c, viimag);
   }
   if (h - 1 == log_n) {
     int p = n >> 1;
@@ -1054,16 +997,16 @@ template <int m, bool HalfZero = false> void butterfly(unsigned int* a, int n) {
   }
 
   if (h <= 12) {
-    for (; h >= 6; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one);
-    if (h >= 4) radix4_stage_scalar_fwd<m, 4>(a, n, 4, info.mont.one);
-    if (h >= 2) radix4_stage_scalar_fwd<m, 1>(a, n, 2, info.mont.one);
+    for (; h >= 6; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one());
+    if (h >= 4) radix4_stage_scalar_fwd<m, 4>(a, n, 4, info.mont.one());
+    if (h >= 2) radix4_stage_scalar_fwd<m, 1>(a, n, 2, info.mont.one());
     return;
   }
 
-  for (; h > 12; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one);
+  for (; h > 12; h -= 2) radix4_stage_scalar_fwd<m>(a, n, h, info.mont.one());
 
-  unsigned int w_init[6] = {info.mont.one, info.mont.one, info.mont.one,
-                            info.mont.one, info.mont.one, info.mont.one};
+  unsigned int w_init[6] = {info.mont.one(), info.mont.one(), info.mont.one(),
+                            info.mont.one(), info.mont.one(), info.mont.one()};
   int s_end = n >> 12;
   for (int s = 0; s < s_end; ++s) {
     unsigned int* blk = a + (s << 12);
@@ -1094,10 +1037,10 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
 
   int h = 2;
   if (log_n <= 12) {
-    if (2 <= log_n) radix4_stage_scalar_inv<m, 1>(a, n, 2, info.mont.one);
-    if (4 <= log_n) radix4_stage_scalar_inv<m, 4>(a, n, 4, info.mont.one);
+    if (2 <= log_n) radix4_stage_scalar_inv<m, 1>(a, n, 2, info.mont.one());
+    if (4 <= log_n) radix4_stage_scalar_inv<m, 4>(a, n, 4, info.mont.one());
     for (h = 6; h <= log_n; h += 2) {
-      radix4_stage_scalar_inv<m>(a, n, h, info.mont.one);
+      radix4_stage_scalar_inv<m>(a, n, h, info.mont.one());
     }
     if ((log_n & 1) != 0) {
       int p = n >> 1;
@@ -1111,8 +1054,8 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
     return;
   }
 
-  unsigned int iw_init[6] = {info.mont.one, info.mont.one, info.mont.one,
-                             info.mont.one, info.mont.one, info.mont.one};
+  unsigned int iw_init[6] = {info.mont.one(), info.mont.one(), info.mont.one(),
+                             info.mont.one(), info.mont.one(), info.mont.one()};
   int s_end = n >> 12;
   for (int s = 0; s < s_end; ++s) {
     unsigned int* blk = a + (s << 12);
@@ -1140,7 +1083,7 @@ template <int m> void butterfly_inv(unsigned int* a, int n) {
   }
 
   for (h = 14; h <= log_n; h += 2) {
-    radix4_stage_scalar_inv<m>(a, n, h, info.mont.one);
+    radix4_stage_scalar_inv<m>(a, n, h, info.mont.one());
   }
   if (log_n & 1) {
     int p = n >> 1;
@@ -1260,25 +1203,13 @@ unsigned int finish_ntt_convolution(unsigned int* a, unsigned int* b, int z,
 
   const auto& info = ntt_info<m>;
   unsigned int iz_mont =
-      info.mont.pow(info.mont.mul((unsigned int)z, info.mont.r2), info.mod - 2);
-  return info.mont.mul(iz_mont, info.mont.r2);
+      info.mont.pow(info.mont.to_mont((unsigned int)z), info.mod - 2);
+  return info.mont.mul(iz_mont, info.mont.r2());
 }
 
 template <int m> void check_convolution_constraints(long long s) {
   assert(NttInfo<m>::valid && m <= 2000000000);
   if (s > 0) assert(s <= (1LL << NttInfo<m>::rank2));
-}
-
-constexpr unsigned int inv_mod_constexpr(unsigned int a, unsigned int m) {
-  unsigned long long res = 1;
-  unsigned long long base = a % m;
-  unsigned int exp = m - 2;
-  while (exp > 0) {
-    if (exp & 1U) res = res * base % m;
-    base = base * base % m;
-    exp >>= 1;
-  }
-  return (unsigned int)res;
 }
 
 template <int m, typename OutT, typename InT>
@@ -1395,8 +1326,9 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
   constexpr int m2 = 2113929217;
   constexpr unsigned long long m12 = (unsigned long long)m1 * m2;
   constexpr unsigned long long m12_half = m12 >> 1;
-  constexpr unsigned int inv12 = internal_convolution::inv_mod_constexpr(
-      (unsigned int)m1, (unsigned int)m2);
+  constexpr internal::Montgomery32 mont2((unsigned int)m2);
+  constexpr unsigned int inv12 = mont2.from_mont(
+      mont2.pow(mont2.to_mont((unsigned int)m1 % (unsigned int)m2), m2 - 2));
 
   bool same_input = (&a == &b);
   int z = (int)std::bit_ceil((unsigned int)s);
