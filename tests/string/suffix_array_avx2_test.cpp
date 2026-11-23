@@ -10,7 +10,6 @@
 
 #include <cassert>
 
-#include "library3372/string/suffix_array.hpp"
 #include "tests/string/suffix_array_test_common.hpp"
 
 int main() {

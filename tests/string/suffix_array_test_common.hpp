@@ -17,6 +17,8 @@
 #include <string_view>
 #include <vector>
 
+#include "library3372/string/suffix_array.hpp"
+
 namespace {
 
 template <typename T, typename Compare = std::less<>>
