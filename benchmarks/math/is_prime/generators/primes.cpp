@@ -4,6 +4,7 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <random>
@@ -12,7 +13,9 @@
 #include "library3372/math/is_prime.hpp"
 
 int main(int argc, char* argv[]) {
+  assert(argc >= 4);
   std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   int q = std::atoi(argv[1]);
   long long min_val = std::atoll(argv[2]);
