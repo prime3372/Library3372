@@ -128,6 +128,10 @@
   // Tarjan's SCC Algorithm
   // https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
   ```
+  - リンクを貼る記事は次の条件を満たすものが好ましいです。
+    - 執筆に複数人が関わっていて、内容に信頼がおけること。
+    - 内容がメンテナンスされていること。
+    - 英語または日本語で書かれていること。
 - このライブラリ独自の実装方法に関してコメントすることは問題ありません。
 
 ## [フォーマット](https://google.github.io/styleguide/cppguide.html#Formatting)
