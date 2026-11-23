@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "library3372/internal/math/convolution_crt.hpp"
+#include "library3372/internal/math/convolution_garner.hpp"
 #include "library3372/internal/math/ntt.hpp"
 
 namespace library3372 {
@@ -62,7 +62,7 @@ std::vector<T> convolution_mod_2_64(const std::vector<T>& a,
   constexpr unsigned long long m0123_u64 = m012_u64 * m3;
 
   std::vector<T> res((int)s);
-  internal::convolution_crt<m0, m1, m2, m3, m4>(
+  internal::convolution_garner<m0, m1, m2, m3, m4>(
       [&](int i) { return (unsigned long long)a[i]; }, n,
       [&](int i) { return (unsigned long long)b[i]; }, k, (&a == &b),
       [&](int i, const unsigned int* x) {

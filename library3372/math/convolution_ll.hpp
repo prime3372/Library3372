@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "library3372/internal/math/convolution_crt.hpp"
+#include "library3372/internal/math/convolution_garner.hpp"
 #include "library3372/internal/math/ntt.hpp"
 
 namespace library3372 {
@@ -53,7 +53,7 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
   constexpr unsigned long long m01_half = m01 >> 1;
 
   std::vector<long long> c((int)s);
-  internal::convolution_crt<m0, m1>([&](int i) { return a[i]; }, n,
+  internal::convolution_garner<m0, m1>([&](int i) { return a[i]; }, n,
                                     [&](int i) { return b[i]; }, k, (&a == &b),
                                     [&](int i, const unsigned int* x) {
                                       unsigned long long val =

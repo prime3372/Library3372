@@ -1,11 +1,11 @@
 // Repository: Library3372
-// File: library3372/internal/math/convolution_crt.hpp
-// URL: https://github.com/prime3372/Library3372/blob/main/library3372/internal/math/convolution_crt.hpp
+// File: library3372/internal/math/convolution_garner.hpp
+// URL: https://github.com/prime3372/Library3372/blob/main/library3372/internal/math/convolution_garner.hpp
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_CRT_HPP_
-#define LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_CRT_HPP_
+#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP
+#define LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP
 
 #include <algorithm>
 #include <bit>
@@ -54,7 +54,7 @@ template <int... Primes> inline constexpr CrtInfo<Primes...> crt_info{};
 // Multi-prime NTT + Garner's CRT reconstruction (1 <= K <= 5 primes < 2^31)
 // https://en.wikipedia.org/wiki/Chinese_remainder_theorem
 template <int... Primes, typename SrcA, typename SrcB, typename ReduceFinal>
-void convolution_crt(SrcA&& get_a, int n, SrcB&& get_b, int k, bool same_input,
+void convolution_garner(SrcA&& get_a, int n, SrcB&& get_b, int k, bool same_input,
                      ReduceFinal&& reduce_final) {
   constexpr int num_primes = sizeof...(Primes);
   const auto& meta = crt_info<Primes...>;
@@ -289,7 +289,7 @@ std::vector<OutT> convolution_arbitrary_mod32(const std::vector<InT>& a,
       return (unsigned int)ptr[i].val();
     }
   };
-  convolution_crt<P0, P1, P2>(
+  convolution_garner<P0, P1, P2>(
       [&](int i) { return read_elem(pa, i); }, n,
       [&](int i) { return read_elem(pb, i); }, k, same_input,
       [&](int i, const unsigned int* x) {
@@ -339,7 +339,7 @@ std::vector<T> convolution_arbitrary_mod64(const std::vector<T>& a,
 
   std::vector<T> res((int)s);
   const unsigned long long* pb_ptr = same_input ? norm_a.data : norm_b.data;
-  convolution_crt<P0, P1, P2, P3, P4>(
+  convolution_garner<P0, P1, P2, P3, P4>(
       [&](int i) { return norm_a.data[i]; }, n,
       [&](int i) { return pb_ptr[i]; }, k, same_input,
       [&](int i, const unsigned int* x) {
@@ -355,4 +355,4 @@ std::vector<T> convolution_arbitrary_mod64(const std::vector<T>& a,
 
 }  // namespace library3372::internal
 
-#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_CRT_HPP_
+#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP

@@ -10,7 +10,7 @@
 #include <cassert>
 #include <vector>
 
-#include "library3372/internal/math/convolution_crt.hpp"
+#include "library3372/internal/math/convolution_garner.hpp"
 #include "library3372/internal/type_traits/is_integer.hpp"
 #include "library3372/math/dynamic_modint.hpp"
 #include "library3372/math/static_modint.hpp"
