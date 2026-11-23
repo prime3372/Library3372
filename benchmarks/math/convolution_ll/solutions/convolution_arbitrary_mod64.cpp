@@ -23,7 +23,7 @@ int main() {
 
   library3372::internal::Timer timer;
   std::vector<long long> c =
-      library3372::convolution_arbitrary_mod<1000000000000000007LL>(a, b);
+      library3372::convolution_arbitrary_mod<4000000000000000007LL>(a, b);
   double run_sec = timer.elapsed();
 
   unsigned long long ans_hash = 0;

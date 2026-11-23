@@ -11,7 +11,7 @@ $$C_k = \sum_{i + j = k} A_i B_j$$
 ## 制約
 
 - $1 \leq N, M \leq 2 \times 10^6$
-- $0 \leq A_i, B_j \leq 20$
+- $0 \leq A_i, B_j \leq 10^6$
 - 入力はすべて整数
 
 ## 入力
