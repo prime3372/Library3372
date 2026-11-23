@@ -134,7 +134,7 @@ Cap MaxFlow::flow(int s, int t, Cap flow_limit);  // (2)
 std::vector<bool> MaxFlow::min_cut(int s) const;
 ```
 
-現在の残余グラフ上で頂点 $s$ から到達可能な頂点を `true`、そうでない頂点を `false` とした長さ $n$ の真偽値配列を返します。`flow(s, t)` を呼び出した直後に呼ぶと、最小 $s$-$t$ カットが得られます。
+現在の残余グラフ上で頂点 $s$ から到達可能な頂点を `true`、そうでない頂点を `false` とした長さ $n$ の真偽値配列を返します。`flow(s, t)` を呼び出した直後に呼ぶと、最小 $s$ - $t$ カットが得られます。
 
 ### 制約
 
