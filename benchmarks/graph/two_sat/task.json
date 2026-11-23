@@ -1,0 +1,31 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["1500", "3000"]
+    },
+    {
+      "name": "random_unsat_large",
+      "generator": "random.cpp",
+      "args": ["500000", "1500000"]
+    },
+    {
+      "name": "planted_small",
+      "generator": "planted.cpp",
+      "args": ["1500", "3000"]
+    },
+    {
+      "name": "planted_large",
+      "generator": "planted.cpp",
+      "args": ["500000", "1500000"]
+    },
+    {
+      "name": "chain_large",
+      "generator": "chain.cpp",
+      "args": ["500000"]
+    }
+  ]
+}
