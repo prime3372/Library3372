@@ -65,18 +65,17 @@ inline void run_convolution_large_tests() {
   assert(convolution_large(std::vector<SMint>{}, std::vector<SMint>{}).empty());
   assert(convolution_large(std::vector<int>{}, std::vector<int>{}, 1).empty());
 
-  std::vector<SMint> m1_a(80, SMint(5));
-  std::vector<StaticModInt<1>> z1(80, StaticModInt<1>(0));
-  assert(convolution_large(z1, z1) ==
-         std::vector<StaticModInt<1>>(159, StaticModInt<1>(0)));
+  std::vector<SMint> m1_a(80, 5);
+  std::vector<StaticModInt<1>> z1(80, 0);
+  assert(convolution_large(z1, z1) == std::vector<StaticModInt<1>>(159, 0));
 
   std::mt19937_64 rng(0xabcdef0123456789ULL);
   for (auto [n, k] : std::vector<std::pair<int, int>>{
            {1, 1}, {1, 70}, {60, 60}, {61, 61}, {129, 130}, {256, 257}}) {
     {
       std::vector<SMint> a(n), b(k);
-      for (int i = 0; i < n; ++i) a[i] = SMint((long long)rng());
-      for (int i = 0; i < k; ++i) b[i] = SMint((long long)rng());
+      for (int i = 0; i < n; ++i) a[i] = (long long)rng();
+      for (int i = 0; i < k; ++i) b[i] = (long long)rng();
       assert(convolution_large(a, b) ==
              naive_convolution_large(a, b, 1000000007));
       assert(convolution_large(a, a) ==
@@ -86,8 +85,8 @@ inline void run_convolution_large_tests() {
       using DMint = DynamicModInt<10>;
       DMint::set_mod(1000000000);
       std::vector<DMint> a(n), b(k);
-      for (int i = 0; i < n; ++i) a[i] = DMint((long long)rng());
-      for (int i = 0; i < k; ++i) b[i] = DMint((long long)rng());
+      for (int i = 0; i < n; ++i) a[i] = (long long)rng();
+      for (int i = 0; i < k; ++i) b[i] = (long long)rng();
       assert(convolution_large(a, b) ==
              naive_convolution_large(a, b, 1000000000));
     }
@@ -120,8 +119,8 @@ inline void run_convolution_large_tests() {
   {
     constexpr int n = 4096;
     constexpr int k = 4097;
-    std::vector<SMint> a(n, SMint(1));
-    std::vector<SMint> b(k, SMint(1));
+    std::vector<SMint> a(n, 1);
+    std::vector<SMint> b(k, 1);
     std::vector<SMint> c = convolution_large(a, b);
     assert((int)c.size() == n + k - 1);
     for (int i = 0; i < (int)c.size(); ++i) {

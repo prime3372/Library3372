@@ -21,7 +21,7 @@ DynamicModInt::DynamicModInt(T v);  // (2)
 ```
 
 - (1): 値 $0$ で初期化します。
-- (2): 整数 $v$ を現在の法 $m$ で割った余りで初期化します。暗黙構築はできないので注意してください。
+- (2): 整数 $v$ を現在の法 $m$ で割った余りで初期化します。
 
 ### 制約
 
@@ -156,17 +156,10 @@ DynamicModInt DynamicModInt::operator--(int);  // (2)
 ## operator+=
 
 ```cpp
-DynamicModInt& DynamicModInt::operator+=(DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt& DynamicModInt::operator+=(T rhs);  // (2)
+DynamicModInt& DynamicModInt::operator+=(DynamicModInt rhs);
 ```
 
 `rhs` を加算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -175,17 +168,10 @@ DynamicModInt& DynamicModInt::operator+=(T rhs);  // (2)
 ## operator-=
 
 ```cpp
-DynamicModInt& DynamicModInt::operator-=(DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt& DynamicModInt::operator-=(T rhs);  // (2)
+DynamicModInt& DynamicModInt::operator-=(DynamicModInt rhs);
 ```
 
 `rhs` を減算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -194,17 +180,10 @@ DynamicModInt& DynamicModInt::operator-=(T rhs);  // (2)
 ## operator\*=
 
 ```cpp
-DynamicModInt& DynamicModInt::operator*=(DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt& DynamicModInt::operator*=(T rhs);  // (2)
+DynamicModInt& DynamicModInt::operator*=(DynamicModInt rhs);
 ```
 
 `rhs` を乗算します。
-
-### 制約
-
-- (2): `T` は整数型
 
 ### 計算量
 
@@ -213,19 +192,14 @@ DynamicModInt& DynamicModInt::operator*=(T rhs);  // (2)
 ## operator/=
 
 ```cpp
-DynamicModInt& DynamicModInt::operator/=(DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt& DynamicModInt::operator/=(T rhs);  // (2)
+DynamicModInt& DynamicModInt::operator/=(DynamicModInt rhs);
 ```
 
 `rhs` で除算します。
 
 ### 制約
 
-- (1): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
-- (2): `T` は整数型
-- (2): $\gcd(\mathrm{DynamicModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
+- $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
 
 ### 計算量
 
@@ -237,20 +211,10 @@ DynamicModInt& DynamicModInt::operator/=(T rhs);  // (2)
 DynamicModInt DynamicModInt::operator+() const;  // (1)
 
 DynamicModInt operator+(DynamicModInt lhs, DynamicModInt rhs);  // (2)
-
-template <typename T>
-DynamicModInt operator+(DynamicModInt lhs, T rhs);  // (3)
-
-template <typename T>
-DynamicModInt operator+(T lhs, DynamicModInt rhs);  // (4)
 ```
 
 - (1): 自身の値をそのまま返します。
-- (2), (3), (4): `lhs` と `rhs` の和を返します。
-
-### 制約
-
-- (3), (4): `T` は整数型
+- (2): `lhs` と `rhs` の和を返します。
 
 ### 計算量
 
@@ -262,20 +226,10 @@ DynamicModInt operator+(T lhs, DynamicModInt rhs);  // (4)
 DynamicModInt DynamicModInt::operator-() const;  // (1)
 
 DynamicModInt operator-(DynamicModInt lhs, DynamicModInt rhs);  // (2)
-
-template <typename T>
-DynamicModInt operator-(DynamicModInt lhs, T rhs);  // (3)
-
-template <typename T>
-DynamicModInt operator-(T lhs, DynamicModInt rhs);  // (4)
 ```
 
 - (1): 加法逆元を返します。
-- (2), (3), (4): `lhs` と `rhs` の差を返します。
-
-### 制約
-
-- (3), (4): `T` は整数型
+- (2): `lhs` と `rhs` の差を返します。
 
 ### 計算量
 
@@ -284,20 +238,10 @@ DynamicModInt operator-(T lhs, DynamicModInt rhs);  // (4)
 ## operator\*
 
 ```cpp
-DynamicModInt operator*(DynamicModInt lhs, DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt operator*(DynamicModInt lhs, T rhs);  // (2)
-
-template <typename T>
-DynamicModInt operator*(T lhs, DynamicModInt rhs);  // (3)
+DynamicModInt operator*(DynamicModInt lhs, DynamicModInt rhs);
 ```
 
 `lhs` と `rhs` の積を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -306,22 +250,14 @@ DynamicModInt operator*(T lhs, DynamicModInt rhs);  // (3)
 ## operator/
 
 ```cpp
-DynamicModInt operator/(DynamicModInt lhs, DynamicModInt rhs);  // (1)
-
-template <typename T>
-DynamicModInt operator/(DynamicModInt lhs, T rhs);  // (2)
-
-template <typename T>
-DynamicModInt operator/(T lhs, DynamicModInt rhs);  // (3)
+DynamicModInt operator/(DynamicModInt lhs, DynamicModInt rhs);
 ```
 
 `lhs` を `rhs` で割った商を返します。
 
 ### 制約
 
-- (1), (3): $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
-- (2): $\gcd(\mathrm{DynamicModInt}(\mathrm{rhs}).\mathrm{val}(), m) = 1$
-- (2), (3): `T` は整数型
+- $\gcd(\mathrm{rhs}.\mathrm{val}(), m) = 1$
 
 ### 計算量
 
@@ -330,20 +266,10 @@ DynamicModInt operator/(T lhs, DynamicModInt rhs);  // (3)
 ## operator==
 
 ```cpp
-bool operator==(DynamicModInt lhs, DynamicModInt rhs);  // (1)
-
-template <typename T>
-bool operator==(DynamicModInt lhs, T rhs);  // (2)
-
-template <typename T>
-bool operator==(T lhs, DynamicModInt rhs);  // (3)
+bool operator==(DynamicModInt lhs, DynamicModInt rhs);
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同であれば `true` を、そうでなければ `false` を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -352,20 +278,10 @@ bool operator==(T lhs, DynamicModInt rhs);  // (3)
 ## operator!=
 
 ```cpp
-bool operator!=(DynamicModInt lhs, DynamicModInt rhs);  // (1)
-
-template <typename T>
-bool operator!=(DynamicModInt lhs, T rhs);  // (2)
-
-template <typename T>
-bool operator!=(T lhs, DynamicModInt rhs);  // (3)
+bool operator!=(DynamicModInt lhs, DynamicModInt rhs);
 ```
 
 `lhs` と `rhs` が法 $m$ の下で合同でなければ `true` を、そうでなければ `false` を返します。
-
-### 制約
-
-- (2), (3): `T` は整数型
 
 ### 計算量
 
@@ -417,7 +333,7 @@ int main() {
   using Mint = library3372::DynamicModInt<0>;
   Mint::set_mod(1000000007);
 
-  Mint a(10);
+  Mint a = 10;
   Mint b = Mint::raw(3);
 
   std::cout << a + b << "\n";      // 13

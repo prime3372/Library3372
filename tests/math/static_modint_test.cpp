@@ -21,12 +21,16 @@ using library3372::StaticModInt;
 template <int m, typename T> void check_integer_type() {
   using Mint = StaticModInt<m>;
 
-  static_assert(!std::is_convertible_v<T, Mint>);
-  static_assert(!std::is_assignable_v<Mint&, T>);
+  static_assert(std::is_convertible_v<T, Mint>);
+  static_assert(std::is_assignable_v<Mint&, T>);
   static_assert(std::is_constructible_v<Mint, T>);
 
-  Mint a(5);
+  Mint a = 5;
   T x = (T)7;
+  Mint c = x;
+  assert(c == Mint(x));
+  c = (T)3;
+  assert(c == Mint((T)3));
 
   assert((a + x) == (a + Mint(x)));
   assert((x + a) == (Mint(x) + a));
@@ -86,7 +90,7 @@ constexpr bool test_constexpr() {
   static_assert(Mint::mod() == 998244353);
   Mint a;
   if (a.val() != 0) return false;
-  Mint b(123);
+  Mint b = 123;
   Mint c = Mint::raw(456);
   Mint d = b + c;
   if (d.val() != 579) return false;
@@ -248,10 +252,12 @@ void test_type_constraints() {
   static_assert(std::is_constructible_v<Mint, bool>);
   static_assert(std::is_constructible_v<Mint, char>);
   static_assert(!std::is_constructible_v<Mint, double>);
-  static_assert(!std::is_convertible_v<int, Mint>);
-  static_assert(!std::is_convertible_v<long long, Mint>);
-  static_assert(!std::is_assignable_v<Mint&, int>);
-  static_assert(!std::is_assignable_v<Mint&, long long>);
+  static_assert(!std::is_convertible_v<double, Mint>);
+  static_assert(!std::is_assignable_v<Mint&, double>);
+  static_assert(std::is_convertible_v<int, Mint>);
+  static_assert(std::is_convertible_v<long long, Mint>);
+  static_assert(std::is_assignable_v<Mint&, int>);
+  static_assert(std::is_assignable_v<Mint&, long long>);
   static_assert(test_constexpr());
 }
 

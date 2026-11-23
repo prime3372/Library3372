@@ -49,8 +49,8 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
 
 int main() {
   using SMint = library3372::StaticModInt<1000000007>;
-  std::vector<SMint> a = {SMint(1), SMint(2), SMint(3), SMint(4)};
-  std::vector<SMint> b = {SMint(1), SMint(2), SMint(4)};
+  std::vector<SMint> a = {1, 2, 3, 4};
+  std::vector<SMint> b = {1, 2, 4};
   for (SMint x : library3372::convolution_arbitrary_mod(a, b)) {
     std::cout << x << " ";
   }
@@ -59,8 +59,8 @@ int main() {
 
   using DMint = library3372::DynamicModInt<0>;
   DMint::set_mod(1000000000);
-  std::vector<DMint> da = {DMint(500000000), DMint(500000000)};
-  std::vector<DMint> db = {DMint(3), DMint(4)};
+  std::vector<DMint> da = {500000000, 500000000};
+  std::vector<DMint> db = {3, 4};
   for (DMint x : library3372::convolution_arbitrary_mod(da, db)) {
     std::cout << x << " ";
   }

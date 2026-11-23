@@ -96,26 +96,26 @@ void test_integer_pair(std::mt19937_64& rng, int n, int k) {
 inline void test_empty_and_small() {
   using Mint = StaticModInt<998244353>;
   assert(convolution(std::vector<Mint>{}, std::vector<Mint>{}).empty());
-  assert(convolution(std::vector<Mint>{Mint(1)}, std::vector<Mint>{}).empty());
-  assert(convolution(std::vector<Mint>{}, std::vector<Mint>{Mint(2)}).empty());
+  assert(convolution(std::vector<Mint>{1}, std::vector<Mint>{}).empty());
+  assert(convolution(std::vector<Mint>{}, std::vector<Mint>{2}).empty());
 
   assert(convolution(std::vector<int>{}, std::vector<int>{}).empty());
   assert(convolution(std::vector<int>{1}, std::vector<int>{}).empty());
   assert(convolution(std::vector<int>{}, std::vector<int>{2}).empty());
 
   // m = 2 (maximum size 1)
-  assert((convolution(std::vector<StaticModInt<2>>{StaticModInt<2>(1)},
-                      std::vector<StaticModInt<2>>{StaticModInt<2>(1)}) ==
-          std::vector<StaticModInt<2>>{StaticModInt<2>(1)}));
+  assert((convolution(std::vector<StaticModInt<2>>{1},
+                      std::vector<StaticModInt<2>>{1}) ==
+          std::vector<StaticModInt<2>>{1}));
   assert((convolution<2>(std::vector<int>{3}, std::vector<int>{-5}) ==
           std::vector<int>{1}));
   assert((convolution<2>(std::vector<bool>{true}, std::vector<bool>{true}) ==
           std::vector<bool>{true}));
 
   // m = 3 (maximum size 2)
-  assert((convolution(std::vector<StaticModInt<3>>{StaticModInt<3>(2)},
-                      std::vector<StaticModInt<3>>{StaticModInt<3>(2)}) ==
-          std::vector<StaticModInt<3>>{StaticModInt<3>(1)}));
+  assert((convolution(std::vector<StaticModInt<3>>{2},
+                      std::vector<StaticModInt<3>>{2}) ==
+          std::vector<StaticModInt<3>>{1}));
   assert((convolution<3>(std::vector<int>{1, 2}, std::vector<int>{2}) ==
           std::vector<int>{2, 1}));
 }
@@ -173,15 +173,15 @@ inline void test_various_primes_and_sizes(std::mt19937_64& rng) {
   // Exact m = 998244353 boundary values (all elements = m - 1)
   {
     using Mint = StaticModInt<998244353>;
-    std::vector<Mint> a(128, Mint(998244352));
-    std::vector<Mint> b(128, Mint(998244352));
+    std::vector<Mint> a(128, 998244352);
+    std::vector<Mint> b(128, 998244352);
     assert(convolution(a, b) == naive_convolution_mod<998244353>(a, b));
   }
   // Exact m = 1811939329 boundary values (all elements = m - 1)
   {
     using Mint = StaticModInt<1811939329>;
-    std::vector<Mint> a(128, Mint(1811939328));
-    std::vector<Mint> b(128, Mint(1811939328));
+    std::vector<Mint> a(128, 1811939328);
+    std::vector<Mint> b(128, 1811939328);
     assert(convolution(a, b) == naive_convolution_mod<1811939329>(a, b));
   }
 }

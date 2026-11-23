@@ -26,8 +26,8 @@ int main() {
   std::vector<Mint> c(n);
   for (int r = 0; r < k; ++r) {
     int s = r % n;
-    for (int i = 0; i < n - s; ++i) c[i] += Mint(a[i + s]);
-    for (int i = n - s; i < n; ++i) c[i] += Mint(a[i + s - n]);
+    for (int i = 0; i < n - s; ++i) c[i] += a[i + s];
+    for (int i = n - s; i < n; ++i) c[i] += a[i + s - n];
   }
   double run_sec = timer.elapsed();
 

@@ -40,7 +40,7 @@ template <int id> class DynamicModInt {
 
   template <typename T>
     requires internal::is_signed_integer_v<T>
-  explicit DynamicModInt(T v) {
+  DynamicModInt(T v) {
     if constexpr (sizeof(T) <= sizeof(long long)) {
       long long x = (long long)v;
       if (x >= 0) {
@@ -58,7 +58,7 @@ template <int id> class DynamicModInt {
 
   template <typename T>
     requires internal::is_unsigned_integer_v<T>
-  explicit DynamicModInt(T v) {
+  DynamicModInt(T v) {
     if constexpr (sizeof(T) <= sizeof(unsigned long long)) {
       val_ = barrett_.reduce((unsigned long long)v);
     } else {
@@ -71,7 +71,7 @@ template <int id> class DynamicModInt {
   DynamicModInt pow(long long n) const {
     assert(n >= 0);
     DynamicModInt x = *this;
-    DynamicModInt res(1);
+    DynamicModInt res = 1;
     while (n > 0) {
       if (n & 1) res *= x;
       x *= x;
@@ -149,30 +149,6 @@ template <int id> class DynamicModInt {
 
   DynamicModInt& operator/=(DynamicModInt rhs) { return *this *= rhs.inv(); }
 
-  template <typename T>
-    requires internal::is_integer_v<T>
-  DynamicModInt& operator+=(T rhs) {
-    return *this += DynamicModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  DynamicModInt& operator-=(T rhs) {
-    return *this -= DynamicModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  DynamicModInt& operator*=(T rhs) {
-    return *this *= DynamicModInt(rhs);
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  DynamicModInt& operator/=(T rhs) {
-    return *this /= DynamicModInt(rhs);
-  }
-
   friend DynamicModInt operator+(DynamicModInt lhs, DynamicModInt rhs) {
     return lhs += rhs;
   }
@@ -189,62 +165,8 @@ template <int id> class DynamicModInt {
     return lhs /= rhs;
   }
 
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator+(DynamicModInt lhs, T rhs) {
-    return lhs += rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator+(T lhs, DynamicModInt rhs) {
-    return DynamicModInt(lhs) += rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator-(DynamicModInt lhs, T rhs) {
-    return lhs -= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator-(T lhs, DynamicModInt rhs) {
-    return DynamicModInt(lhs) -= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator*(DynamicModInt lhs, T rhs) {
-    return lhs *= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator*(T lhs, DynamicModInt rhs) {
-    return DynamicModInt(lhs) *= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator/(DynamicModInt lhs, T rhs) {
-    return lhs /= rhs;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend DynamicModInt operator/(T lhs, DynamicModInt rhs) {
-    return DynamicModInt(lhs) /= rhs;
-  }
-
   friend bool operator==(DynamicModInt lhs, DynamicModInt rhs) {
     return lhs.val_ == rhs.val_;
-  }
-
-  template <typename T>
-    requires internal::is_integer_v<T>
-  friend bool operator==(DynamicModInt lhs, T rhs) {
-    return lhs == DynamicModInt(rhs);
   }
 
   friend std::ostream& operator<<(std::ostream& os, DynamicModInt x) {
@@ -262,14 +184,14 @@ template <int id> class DynamicModInt {
       [[maybe_unused]] std::from_chars_result res =
           std::from_chars(begin, end, v);
       assert(res.ec == std::errc() && res.ptr == end);
-      x = DynamicModInt(v);
+      x = v;
     } else {
       if (s[0] == '+') ++begin;
       unsigned long long v = 0;
       [[maybe_unused]] std::from_chars_result res =
           std::from_chars(begin, end, v);
       assert(res.ec == std::errc() && res.ptr == end);
-      x = DynamicModInt(v);
+      x = v;
     }
     return is;
   }
