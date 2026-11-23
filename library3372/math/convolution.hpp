@@ -122,6 +122,96 @@ std::vector<OutT> convolution_impl(const std::vector<InT>& a,
   return res;
 }
 
+template <long long m, typename T> unsigned long long normalize_elem64(T v) {
+  if constexpr (internal::is_signed_integer_v<T>) {
+    if constexpr (sizeof(T) <= sizeof(long long)) {
+      long long x = (long long)v % m;
+      if (x < 0) x += m;
+      return (unsigned long long)x;
+    } else {
+      long long x = (long long)(v % (__int128)m);
+      if (x < 0) x += m;
+      return (unsigned long long)x;
+    }
+  } else {
+    if constexpr (sizeof(T) <= sizeof(unsigned long long)) {
+      return (unsigned long long)v % (unsigned long long)m;
+    } else {
+      return (unsigned long long)(v % (unsigned __int128)m);
+    }
+  }
+}
+
+template <long long m, typename T>
+std::vector<T> convolution64_naive(const unsigned long long* a, int n,
+                                   const unsigned long long* b, int k) {
+  if (n < k) {
+    std::swap(a, b);
+    std::swap(n, k);
+  }
+  int len = n + k - 1;
+  std::vector<T> ans(len);
+  unsigned long long mod = (unsigned long long)m;
+  constexpr unsigned __int128 limit = (unsigned __int128)1 << 126;
+  for (int idx = 0; idx < len; ++idx) {
+    int lo = idx >= k - 1 ? idx - k + 1 : 0;
+    int hi = idx < n ? idx : n - 1;
+    unsigned __int128 sum = 0;
+    for (int i = lo; i <= hi; ++i) {
+      sum += (unsigned __int128)a[i] * b[idx - i];
+      if (sum >= limit) sum %= mod;
+    }
+    ans[idx] = (T)(unsigned long long)(sum % mod);
+  }
+  return ans;
+}
+
+template <long long m, typename T>
+std::vector<T> convolution64_impl(const std::vector<T>& a,
+                                  const std::vector<T>& b) {
+  assert(internal::NttInfo64<m>::valid);
+  if (a.empty() || b.empty()) return {};
+  int n = (int)a.size();
+  int k = (int)b.size();
+  long long s = (long long)n + k - 1;
+  assert(s <= (1LL << internal::NttInfo64<m>::rank2));
+
+  bool same_input = (&a == &b);
+  if (std::min(n, k) <= internal::ntt_naive_threshold) {
+    internal::NttAlignedBuffer64 raw_a(n);
+    for (int i = 0; i < n; ++i) raw_a.data[i] = normalize_elem64<m>(a[i]);
+    if (same_input) {
+      return convolution64_naive<m, T>(raw_a.data, n, raw_a.data, n);
+    }
+    internal::NttAlignedBuffer64 raw_b(k);
+    for (int i = 0; i < k; ++i) raw_b.data[i] = normalize_elem64<m>(b[i]);
+    return convolution64_naive<m, T>(raw_a.data, n, raw_b.data, k);
+  }
+
+  int z = (int)std::bit_ceil((unsigned int)s);
+  internal::NttAlignedBuffer64 raw_a(z);
+  for (int i = 0; i < n; ++i) raw_a.data[i] = normalize_elem64<m>(a[i]);
+  internal::ntt_forward_prepared64<m>(raw_a.data, n, z);
+
+  unsigned long long factor = 0;
+  if (same_input) {
+    factor =
+        internal::finish_ntt_convolution64<m>(raw_a.data, nullptr, z, true);
+  } else {
+    internal::NttAlignedBuffer64 raw_b(z);
+    for (int i = 0; i < k; ++i) raw_b.data[i] = normalize_elem64<m>(b[i]);
+    internal::ntt_forward_prepared64<m>(raw_b.data, k, z);
+    factor =
+        internal::finish_ntt_convolution64<m>(raw_a.data, raw_b.data, z, false);
+  }
+
+  std::vector<T> res((int)s);
+  internal::ntt_scale_out64<m>(
+      raw_a.data, (int)s, factor,
+      [&](int i, unsigned long long v) { res[i] = (T)v; });
+  return res;
+}
+
 }  // namespace internal_convolution
 
 // Discrete convolution modulo m via Number Theoretic Transform (NTT)
@@ -133,10 +223,14 @@ std::vector<StaticModInt<m>> convolution(
   return internal_convolution::convolution_impl<m, StaticModInt<m>>(a, b);
 }
 
-template <int m = 998244353, typename T>
+template <long long m = 998244353, typename T>
   requires internal::is_integer_v<T>
 std::vector<T> convolution(const std::vector<T>& a, const std::vector<T>& b) {
-  return internal_convolution::convolution_impl<m, T>(a, b);
+  if constexpr (m <= 2000000000LL) {
+    return internal_convolution::convolution_impl<(int)m, T>(a, b);
+  } else {
+    return internal_convolution::convolution64_impl<m, T>(a, b);
+  }
 }
 
 }  // namespace library3372

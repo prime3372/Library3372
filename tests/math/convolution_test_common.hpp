@@ -186,11 +186,85 @@ inline void test_various_primes_and_sizes(std::mt19937_64& rng) {
   }
 }
 
+template <long long m, typename T>
+std::vector<T> naive_convolution_mod64(const std::vector<T>& a,
+                                       const std::vector<T>& b) {
+  if (a.empty() || b.empty()) return {};
+  int n = (int)a.size();
+  int k = (int)b.size();
+  auto norm = [](T v) -> unsigned long long {
+    if constexpr (library3372::internal::is_signed_integer_v<T>) {
+      long long r = (long long)(v % (__int128)m);
+      if (r < 0) r += m;
+      return (unsigned long long)r;
+    } else {
+      return (unsigned long long)(v % (unsigned __int128)m);
+    }
+  };
+  std::vector<T> c(n + k - 1);
+  for (int i = 0; i < n; ++i) {
+    unsigned long long av = norm(a[i]);
+    for (int j = 0; j < k; ++j) {
+      unsigned long long bv = norm(b[j]);
+      unsigned long long prod =
+          (unsigned long long)((unsigned __int128)av * bv %
+                               (unsigned long long)m);
+      unsigned long long cur = (unsigned long long)c[i + j];
+      unsigned __int128 sum = (unsigned __int128)cur + prod;
+      c[i + j] = (T)(unsigned long long)(sum % (unsigned long long)m);
+    }
+  }
+  return c;
+}
+
+template <long long m, typename T>
+void test_64bit_prime_pair(std::mt19937_64& rng, int n, int k) {
+  std::vector<T> a(n), b(k);
+  for (int i = 0; i < n; ++i) {
+    if constexpr (library3372::internal::is_signed_integer_v<T>) {
+      unsigned __int128 r = ((unsigned __int128)rng() << 64) ^ rng();
+      a[i] = (T)(long long)((__int128)(r % ((unsigned __int128)m * 2)) - m);
+    } else {
+      a[i] = (T)rng();
+    }
+  }
+  for (int i = 0; i < k; ++i) {
+    if constexpr (library3372::internal::is_signed_integer_v<T>) {
+      unsigned __int128 r = ((unsigned __int128)rng() << 64) ^ rng();
+      b[i] = (T)(long long)((__int128)(r % ((unsigned __int128)m * 2)) - m);
+    } else {
+      b[i] = (T)rng();
+    }
+  }
+  assert(convolution<m>(a, b) == naive_convolution_mod64<m>(a, b));
+  if (n <= 256) {
+    assert(convolution<m>(a, a) == naive_convolution_mod64<m>(a, a));
+  }
+}
+
+inline void test_64bit_primes(std::mt19937_64& rng) {
+  // 4179340454199820289 = 29 * 2^57 + 1 (rank2 = 57)
+  // 1945555039024054273 = 27 * 2^56 + 1 (rank2 = 56)
+  // 9223372036737335297 = 549755813881 * 2^24 + 1 (rank2 = 24, near LLONG_MAX)
+  for (auto [n, k] : std::vector<std::pair<int, int>>{
+           {1, 1}, {1, 70}, {60, 60}, {61, 61}, {65, 130}, {256, 257}}) {
+    test_64bit_prime_pair<4179340454199820289LL, long long>(rng, n, k);
+    test_64bit_prime_pair<1945555039024054273LL, unsigned long long>(rng, n, k);
+    test_64bit_prime_pair<9223372036737335297LL, long long>(rng, n, k);
+    test_64bit_prime_pair<4179340454199820289LL, __int128>(rng, n, k);
+  }
+  std::vector<long long> a(128, 9223372036737335296LL);
+  std::vector<long long> b(128, 9223372036737335296LL);
+  assert(convolution<9223372036737335297LL>(a, b) ==
+         naive_convolution_mod64<9223372036737335297LL>(a, b));
+}
+
 inline void run_all_convolution_tests() {
   std::mt19937_64 rng(0x9e3779b97f4a7c15ULL);
   test_empty_and_small();
   test_default_mod_and_types(rng);
   test_various_primes_and_sizes(rng);
+  test_64bit_primes(rng);
 }
 
 }  // namespace

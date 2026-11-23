@@ -25,38 +25,39 @@ using library3372::convolution_arbitrary_mod;
 using library3372::DynamicModInt;
 using library3372::StaticModInt;
 
-template <typename T> unsigned int ref_normalize(T v, int mod) {
+template <typename T> unsigned long long ref_normalize(T v, long long mod) {
   if constexpr (library3372::internal::is_signed_integer_v<T>) {
-    int r = (int)(v % (__int128)mod);
+    long long r = (long long)(v % (__int128)mod);
     if (r < 0) r += mod;
-    return (unsigned int)r;
+    return (unsigned long long)r;
   } else if constexpr (library3372::internal::is_unsigned_integer_v<T>) {
-    return (unsigned int)(v % (unsigned __int128)mod);
+    return (unsigned long long)(v % (unsigned __int128)mod);
   } else {
-    return (unsigned int)v.val();
+    return (unsigned long long)v.val();
   }
 }
 
 template <typename T>
 std::vector<T> naive_convolution_arbitrary_mod(const std::vector<T>& a,
                                                const std::vector<T>& b,
-                                               int mod) {
+                                               long long mod) {
   if (a.empty() || b.empty()) return {};
   int n = (int)a.size();
   int k = (int)b.size();
   std::vector<T> c(n + k - 1);
+  unsigned long long umod = (unsigned long long)mod;
   for (int i = 0; i < n; ++i) {
-    unsigned int av = ref_normalize(a[i], mod);
+    unsigned long long av = ref_normalize(a[i], mod);
     for (int j = 0; j < k; ++j) {
-      unsigned int bv = ref_normalize(b[j], mod);
-      unsigned int prod = (unsigned int)((unsigned long long)av * bv % mod);
+      unsigned long long bv = ref_normalize(b[j], mod);
+      unsigned long long prod =
+          (unsigned long long)((unsigned __int128)av * bv % umod);
       if constexpr (library3372::internal::is_integer_v<T>) {
-        unsigned int cur = (unsigned int)c[i + j];
-        unsigned int sum = cur + prod;
-        if (sum >= (unsigned int)mod) sum -= (unsigned int)mod;
-        c[i + j] = (T)sum;
+        unsigned long long cur = (unsigned long long)c[i + j];
+        unsigned __int128 sum = (unsigned __int128)cur + prod;
+        c[i + j] = (T)(unsigned long long)(sum % umod);
       } else {
-        c[i + j] += T::raw(prod);
+        c[i + j] += T::raw((unsigned int)prod);
       }
     }
   }
@@ -232,6 +233,30 @@ inline void run_convolution_arbitrary_mod_tests() {
   // Larger randomized size sanity checks (> 4096)
   test_static_pair<1000000007>(rng, 4096, 4096);
   test_dynamic_pair<2>(rng, 1000000000, 4096, 4097);
+
+  // 64-bit arbitrary mod (> INT_MAX, up to LLONG_MAX)
+  constexpr long long mods64[] = {2147483648LL, (1LL << 40) + 7LL,
+                                  1000000000000000000LL, LLONG_MAX};
+  for (long long mod : mods64) {
+    for (auto [n, k] : std::vector<std::pair<int, int>>{
+             {1, 1}, {1, 70}, {60, 60}, {61, 61}, {129, 130}, {256, 257}}) {
+      std::vector<long long> a(n), b(k);
+      for (int i = 0; i < n; ++i) a[i] = (long long)rng();
+      for (int i = 0; i < k; ++i) b[i] = (long long)rng();
+      assert(convolution_arbitrary_mod(a, b, mod) ==
+             naive_convolution_arbitrary_mod(a, b, mod));
+      assert(convolution_arbitrary_mod(a, a, mod) ==
+             naive_convolution_arbitrary_mod(a, a, mod));
+    }
+  }
+  {
+    std::vector<long long> a(200, LLONG_MAX - 1);
+    std::vector<long long> b(200, LLONG_MAX - 1);
+    assert(convolution_arbitrary_mod<LLONG_MAX>(a, b) ==
+           naive_convolution_arbitrary_mod(a, b, LLONG_MAX));
+    assert(convolution_arbitrary_mod<1000000000000000007LL>(a, b) ==
+           naive_convolution_arbitrary_mod(a, b, 1000000000000000007LL));
+  }
 }
 
 }  // namespace

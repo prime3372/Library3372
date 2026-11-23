@@ -18,9 +18,9 @@ std::vector<DynamicModInt<id>> convolution_arbitrary_mod(
 template <typename T>
 std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b,
-                                         int mod);  // (3)
+                                         long long mod);  // (3)
 
-template <int m, typename T>
+template <long long m, typename T>
 std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b);  // (4)
 ```

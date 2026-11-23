@@ -10,7 +10,7 @@ std::vector<StaticModInt<m>> convolution(
     const std::vector<StaticModInt<m>>& a,
     const std::vector<StaticModInt<m>>& b);  // (1)
 
-template <int m = 998244353, typename T>
+template <long long m = 998244353, typename T>
 std::vector<T> convolution(const std::vector<T>& a,
                            const std::vector<T>& b);  // (2)
 ```
@@ -19,7 +19,8 @@ std::vector<T> convolution(const std::vector<T>& a,
 
 ### 制約
 
-- $2 \leq m \leq 2 \times 10^9$
+- (1): $2 \leq m \leq 2 \times 10^9$
+- (2): $m \geq 2$
 - $m$ は素数
 - $2^c \mid (m - 1)$ かつ $|a| + |b| - 1 \leq 2^c$ を満たす整数 $c$ が存在する
 - (2): `T` は整数型
