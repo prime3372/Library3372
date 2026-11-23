@@ -1,0 +1,41 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["2000", "26"]
+    },
+    {
+      "name": "random_ascii_large",
+      "generator": "random.cpp",
+      "args": ["1000000", "26"]
+    },
+    {
+      "name": "random_binary_large",
+      "generator": "random.cpp",
+      "args": ["1000000", "2"]
+    },
+    {
+      "name": "random_1e9_large",
+      "generator": "random.cpp",
+      "args": ["500000", "1000000000"]
+    },
+    {
+      "name": "fibonacci_large",
+      "generator": "fibonacci.cpp",
+      "args": ["1000000"]
+    },
+    {
+      "name": "thue_morse_large",
+      "generator": "thue_morse.cpp",
+      "args": ["1000000"]
+    },
+    {
+      "name": "periodic_large",
+      "generator": "periodic.cpp",
+      "args": ["1000000", "7"]
+    }
+  ]
+}
