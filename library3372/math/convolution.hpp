@@ -121,8 +121,7 @@ struct Montgomery32 {
 };
 
 template <int m> struct NttInfo {
-  static constexpr bool valid =
-      (m >= 2 && m <= 2000000000 && is_prime_constexpr(m));
+  static constexpr bool valid = (m >= 2 && is_prime_constexpr(m));
   static constexpr unsigned int mod = (unsigned int)(valid ? m : 3);
   static constexpr bool lazy = (mod < (1U << 30));
   static constexpr int rank2 = std::countr_zero(mod - 1);
@@ -1266,7 +1265,7 @@ unsigned int finish_ntt_convolution(unsigned int* a, unsigned int* b, int z,
 }
 
 template <int m> void check_convolution_constraints(long long s) {
-  assert(NttInfo<m>::valid);
+  assert(NttInfo<m>::valid && m <= 2000000000);
   if (s > 0) assert(s <= (1LL << NttInfo<m>::rank2));
 }
 
@@ -1285,7 +1284,7 @@ constexpr unsigned int inv_mod_constexpr(unsigned int a, unsigned int m) {
 template <int m, typename OutT, typename InT>
 std::vector<OutT> convolution_impl(const std::vector<InT>& a,
                                    const std::vector<InT>& b) {
-  assert(NttInfo<m>::valid);
+  assert(NttInfo<m>::valid && m <= 2000000000);
   if (a.empty() || b.empty()) return {};
   int n = (int)a.size();
   int k = (int)b.size();
@@ -1392,15 +1391,12 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
     return ans;
   }
 
-  constexpr int m1 = 754974721;
-  constexpr int m2 = 167772161;
-  constexpr int m3 = 469762049;
+  constexpr int m1 = 2130706433;
+  constexpr int m2 = 2113929217;
   constexpr unsigned long long m12 = (unsigned long long)m1 * m2;
-  constexpr unsigned __int128 m123 = (unsigned __int128)m12 * m3;
+  constexpr unsigned long long m12_half = m12 >> 1;
   constexpr unsigned int inv12 = internal_convolution::inv_mod_constexpr(
       (unsigned int)m1, (unsigned int)m2);
-  constexpr unsigned int inv123 = internal_convolution::inv_mod_constexpr(
-      (unsigned int)(m12 % m3), (unsigned int)m3);
 
   bool same_input = (&a == &b);
   int z = (int)std::bit_ceil((unsigned int)s);
@@ -1419,30 +1415,22 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
   };
 
   internal_convolution::AlignedBuffer c1((int)s);
-  internal_convolution::AlignedBuffer c2((int)s);
   run(std::integral_constant<int, m1>{}, c1.data);
-  run(std::integral_constant<int, m2>{}, c2.data);
-  run(std::integral_constant<int, m3>{}, ra.data);
+  run(std::integral_constant<int, m2>{}, ra.data);
 
   std::vector<long long> c((int)s);
   for (int i = 0; i < (int)s; ++i) {
     unsigned long long r1 = c1.data[i];
-    unsigned long long r2 = c2.data[i];
-    unsigned long long r3 = ra.data[i];
-
-    unsigned long long k2 =
-        (r2 + (unsigned long long)m2 - r1 % (unsigned long long)m2) * inv12 %
-        (unsigned long long)m2;
-    unsigned long long v12 = r1 + (unsigned long long)m1 * k2;
-    unsigned long long k3 =
-        (r3 + (unsigned long long)m3 - v12 % (unsigned long long)m3) * inv123 %
-        (unsigned long long)m3;
-    unsigned __int128 x = v12 + (unsigned __int128)m12 * k3;
-    if (x >= (1ULL << 63)) {
-      c[i] = (long long)(__int128)(x - m123);
-    } else {
-      c[i] = (long long)x;
-    }
+    unsigned long long r2 = ra.data[i];
+    unsigned long long r1_mod_m2 =
+        r1 >= (unsigned long long)m2 ? r1 - (unsigned long long)m2 : r1;
+    unsigned long long diff = r2 >= r1_mod_m2
+                                  ? r2 - r1_mod_m2
+                                  : r2 + (unsigned long long)m2 - r1_mod_m2;
+    unsigned long long k2 = diff * inv12 % (unsigned long long)m2;
+    unsigned long long x = r1 + (unsigned long long)m1 * k2;
+    if (x > m12_half) x -= m12;
+    c[i] = (long long)x;
   }
   return c;
 }

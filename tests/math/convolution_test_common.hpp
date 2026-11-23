@@ -224,19 +224,27 @@ inline void test_convolution_ll(std::mt19937_64& rng) {
     if (n <= 1024) assert(convolution_ll(a, a) == naive_convolution_ll(a, a));
   }
 
-  // Extreme signed 64-bit boundary values with NTT path (n = k = 64)
+  // Extreme values within 2-prime CRT range with NTT path (n = k = 64)
   {
+    constexpr long long limit = 2252081290784276480LL;
     std::vector<long long> a(64, 0), b(64, 0);
-    a[0] = LLONG_MAX;
+    a[0] = limit;
     b[0] = 1;
-    a[63] = LLONG_MIN;
+    a[63] = -limit;
     b[63] = 1;
     a[31] = -1;
     b[32] = 1;
     assert(convolution_ll(a, b) == naive_convolution_ll(a, b));
   }
   {
-    std::vector<long long> a(65, 1000000000LL), b(65, -1000000000LL);
+    std::vector<long long> a(65, 100000000LL), b(65, -100000000LL);
+    assert(convolution_ll(a, b) == naive_convolution_ll(a, b));
+  }
+  // Cancellation from huge intermediate terms into CRT range
+  {
+    std::vector<long long> a(64, 1000000000000LL), b(64, 0);
+    b[0] = 1000000LL;
+    b[1] = -1000000LL;
     assert(convolution_ll(a, b) == naive_convolution_ll(a, b));
   }
 }

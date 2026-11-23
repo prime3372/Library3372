@@ -40,7 +40,7 @@ std::vector<long long> convolution_ll(const std::vector<long long>& a,
 ### 制約
 
 - $|a| + |b| - 1 \leq 2^{24}$
-- 出力の各要素がすべて `long long` に収まる
+- 出力の各要素を $c_k$ として $|c_k| \leq 2252081290784276480$
 
 ### 計算量
 
@@ -72,12 +72,12 @@ int main() {
   std::cout << "\n";
   // 1 4 11 18 20 16
 
-  std::vector<long long> al = {1000000000LL, 2000000000LL};
-  std::vector<long long> bl = {1000000000LL, 2000000000LL};
+  std::vector<long long> al = {1000000000LL, 1000000000LL};
+  std::vector<long long> bl = {1000000000LL, 1000000000LL};
   std::vector<long long> cl = library3372::convolution_ll(al, bl);
   for (long long x : cl) std::cout << x << " ";
   std::cout << "\n";
-  // 1000000000000000000 4000000000000000000 4000000000000000000
+  // 1000000000000000000 2000000000000000000 1000000000000000000
 
   return 0;
 }
