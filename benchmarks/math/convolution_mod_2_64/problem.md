@@ -11,7 +11,6 @@ $$C_k = \left(\sum_{i + j = k} A_i B_j\right) \bmod 2^{64}$$
 ## 制約
 
 - $1 \leq N, M \leq 2^{23}$
-- $N + M - 1 \leq 2^{24}$
 - $0 \leq A_i, B_j < 2^{64}$
 - 入力はすべて整数
 

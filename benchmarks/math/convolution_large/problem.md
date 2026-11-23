@@ -10,8 +10,7 @@ $$C_k = \left(\sum_{i + j = k} A_i B_j\right) \bmod P$$
 
 ## 制約
 
-- $1 \leq N, M \leq 16777216$
-- $N + M - 1 \leq 33554432$
+- $1 \leq N, M \leq 2^{24}$
 - $0 \leq A_i, B_j < 998244353$
 - 入力はすべて整数
 
