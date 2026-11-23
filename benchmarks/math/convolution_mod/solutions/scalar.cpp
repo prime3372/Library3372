@@ -1,6 +1,6 @@
 // Repository: Library3372
-// File: benchmarks/math/convolution/solutions/scalar.cpp
-// URL: https://github.com/prime3372/Library3372/blob/main/benchmarks/math/convolution/solutions/scalar.cpp
+// File: benchmarks/math/convolution_mod/solutions/scalar.cpp
+// URL: https://github.com/prime3372/Library3372/blob/main/benchmarks/math/convolution_mod/solutions/scalar.cpp
 // Author: prime3372
 // License: CC0 1.0 Universal
 

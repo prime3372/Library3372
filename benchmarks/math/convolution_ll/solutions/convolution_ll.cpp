@@ -1,10 +1,10 @@
 // Repository: Library3372
-// File: benchmarks/math/convolution_variants/solutions/convolution_mod_2_32.cpp
-// URL: https://github.com/prime3372/Library3372/blob/main/benchmarks/math/convolution_variants/solutions/convolution_mod_2_32.cpp
+// File: benchmarks/math/convolution_ll/solutions/convolution_ll.cpp
+// URL: https://github.com/prime3372/Library3372/blob/main/benchmarks/math/convolution_ll/solutions/convolution_ll.cpp
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#include "library3372/math/convolution_mod_2_32.hpp"
+#include "library3372/math/convolution_ll.hpp"
 
 #include <iostream>
 #include <vector>
@@ -18,16 +18,16 @@ int main() {
 
   int n, m;
   std::cin >> n >> m;
-  std::vector<unsigned int> a(n), b(m);
+  std::vector<long long> a(n), b(m);
   for (int i = 0; i < n; ++i) std::cin >> a[i];
   for (int i = 0; i < m; ++i) std::cin >> b[i];
 
   library3372::internal::Timer timer;
-  std::vector<unsigned int> c = library3372::convolution_mod_2_32(a, b);
+  std::vector<long long> c = library3372::convolution_ll(a, b);
   double run_sec = timer.elapsed();
 
   unsigned long long ans_hash = 0;
-  for (unsigned int x : c) {
+  for (long long x : c) {
     ans_hash =
         library3372::internal::hash_combine(ans_hash, (unsigned long long)x);
   }
