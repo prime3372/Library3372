@@ -9,19 +9,19 @@
 
 #include <algorithm>
 #include <cassert>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "library3372/internal/math/convolution_crt.hpp"
 #include "library3372/internal/math/ntt.hpp"
-#include "library3372/internal/type_traits/is_integer.hpp"
 
 namespace library3372 {
 
 // Convolution modulo 2^32 via 3-prime NTT and Garner's CRT reconstruction
 // https://en.wikipedia.org/wiki/Chinese_remainder_theorem
-template <typename T = unsigned int>
-  requires internal::is_integer_v<T>
+template <typename T>
+  requires(std::is_same_v<T, int> || std::is_same_v<T, unsigned int>)
 std::vector<T> convolution_mod_2_32(const std::vector<T>& a,
                                     const std::vector<T>& b) {
   if (a.empty() || b.empty()) return {};
@@ -31,8 +31,8 @@ std::vector<T> convolution_mod_2_32(const std::vector<T>& a,
   assert(s <= (1LL << 24));
 
   if (std::min(n, k) <= internal::ntt_naive_threshold) {
-    const std::vector<T>* pa = &a;
-    const std::vector<T>* pb = &b;
+    const T* pa = a.data();
+    const T* pb = b.data();
     if (n < k) {
       std::swap(pa, pb);
       std::swap(n, k);
@@ -43,7 +43,7 @@ std::vector<T> convolution_mod_2_32(const std::vector<T>& a,
       int hi = idx < n ? idx : n - 1;
       unsigned int sum = 0;
       for (int i = lo; i <= hi; ++i) {
-        sum += (unsigned int)(*pa)[i] * (unsigned int)(*pb)[idx - i];
+        sum += (unsigned int)pa[i] * (unsigned int)pb[idx - i];
       }
       ans[idx] = (T)sum;
     }

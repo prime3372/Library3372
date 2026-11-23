@@ -47,6 +47,21 @@ void test_mod_2_64_pair(std::mt19937_64& rng, int n, int k) {
   }
 }
 
+template <typename T>
+concept can_call_convolution_mod_2_64 =
+    requires(const std::vector<T>& a, const std::vector<T>& b) {
+      convolution_mod_2_64(a, b);
+    };
+
+static_assert(can_call_convolution_mod_2_64<long long>);
+static_assert(can_call_convolution_mod_2_64<unsigned long long>);
+static_assert(!can_call_convolution_mod_2_64<int>);
+static_assert(!can_call_convolution_mod_2_64<unsigned int>);
+static_assert(!can_call_convolution_mod_2_64<short>);
+static_assert(!can_call_convolution_mod_2_64<bool>);
+static_assert(!can_call_convolution_mod_2_64<__int128>);
+static_assert(!can_call_convolution_mod_2_64<double>);
+
 inline void run_convolution_mod_2_64_tests() {
   assert(convolution_mod_2_64(std::vector<unsigned long long>{},
                               std::vector<unsigned long long>{})
@@ -79,13 +94,7 @@ inline void run_convolution_mod_2_64_tests() {
                                                       {256, 257},
                                                       {512, 513}}) {
     test_mod_2_64_pair<unsigned long long>(rng, n, k);
-    if (n <= 257) {
-      test_mod_2_64_pair<long long>(rng, n, k);
-      test_mod_2_64_pair<unsigned int>(rng, n, k);
-      test_mod_2_64_pair<int>(rng, n, k);
-      test_mod_2_64_pair<__int128>(rng, n, k);
-      test_mod_2_64_pair<bool>(rng, n, k);
-    }
+    test_mod_2_64_pair<long long>(rng, n, k);
   }
 }
 

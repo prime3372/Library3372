@@ -5,7 +5,7 @@
 ## convolution_mod_2_32
 
 ```cpp
-template <typename T = unsigned int>
+template <typename T>
 std::vector<T> convolution_mod_2_32(const std::vector<T>& a,
                                     const std::vector<T>& b);
 ```
@@ -15,7 +15,7 @@ std::vector<T> convolution_mod_2_32(const std::vector<T>& a,
 ### 制約
 
 - $|a| + |b| - 1 \leq 2^{24}$
-- `T` は整数型
+- `T` は `int` または `unsigned int`
 
 ### 計算量
 

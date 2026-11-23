@@ -5,7 +5,7 @@
 ## convolution_mod_2_64
 
 ```cpp
-template <typename T = unsigned long long>
+template <typename T>
 std::vector<T> convolution_mod_2_64(const std::vector<T>& a,
                                     const std::vector<T>& b);
 ```
@@ -15,7 +15,7 @@ std::vector<T> convolution_mod_2_64(const std::vector<T>& a,
 ### 制約
 
 - $|a| + |b| - 1 \leq 2^{24}$
-- `T` は整数型
+- `T` は `long long` または `unsigned long long`
 
 ### 計算量
 
