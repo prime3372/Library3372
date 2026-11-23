@@ -21,7 +21,7 @@ int main() {
 
   int n, m;
   std::cin >> n >> m;
-  using Mint = library3372::StaticModInt<1000000007>;
+  using Mint = library3372::StaticModInt<998244353>;
   std::vector<Mint> a(n), b(m);
   for (int i = 0; i < n; ++i) {
     int x;

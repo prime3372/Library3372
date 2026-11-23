@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
   int m = std::atoi(argv[2]);
 
   std::mt19937_64 rng(0x7c9d4e2a6b1f8035ULL);
-  std::uniform_int_distribution<int> dist(0, 1000000006);
+  std::uniform_int_distribution<int> dist(0, 998244352);
 
   std::cout << n << ' ' << m << '\n';
   for (int i = 0; i < n; ++i) {
