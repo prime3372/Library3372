@@ -1,0 +1,36 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "single_32bit",
+      "generator": "random32.cpp",
+      "args": ["1", "50000000"]
+    },
+    {
+      "name": "many_32bit",
+      "generator": "random32.cpp",
+      "args": ["500000", "30"]
+    },
+    {
+      "name": "init_heavy_32bit",
+      "generator": "random32.cpp",
+      "args": ["1000000", "1"]
+    },
+    {
+      "name": "single_64bit",
+      "generator": "random64.cpp",
+      "args": ["1", "50000000"]
+    },
+    {
+      "name": "many_64bit",
+      "generator": "random64.cpp",
+      "args": ["300000", "60"]
+    },
+    {
+      "name": "init_heavy_64bit",
+      "generator": "random64.cpp",
+      "args": ["1000000", "1"]
+    }
+  ]
+}
