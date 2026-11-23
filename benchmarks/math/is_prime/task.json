@@ -1,0 +1,31 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_int",
+      "generator": "random.cpp",
+      "args": ["1000000", "1", "2147483647", "0"]
+    },
+    {
+      "name": "random_odd_64",
+      "generator": "random.cpp",
+      "args": ["500000", "1", "9223372036854775807", "1"]
+    },
+    {
+      "name": "primes_int",
+      "generator": "primes.cpp",
+      "args": ["500000", "1000000000", "2147483647"]
+    },
+    {
+      "name": "primes_64",
+      "generator": "primes.cpp",
+      "args": ["300000", "4611686018427387904", "9223372036854775807"]
+    },
+    {
+      "name": "semiprimes_64",
+      "generator": "semiprimes.cpp",
+      "args": ["300000", "1000000000", "3037000499"]
+    }
+  ]
+}
