@@ -29,6 +29,14 @@ g++ main.cpp -std=c++20 -I /path/to/Library3372
 
 各種 API は `library3372` 名前空間の中に定義されているので、最初に `using namespace library3372;` を書くか、シンボルに `library3372::` を付けてスコープを解決してください。
 
+オンラインジャッジに提出する際は `bundle.py` を使って `#include "..."` を 1 つのファイルに展開してください。
+
+```sh
+python3 /path/to/Library3372/bundle.py main.cpp -o combined.cpp
+```
+
+`-o` を省略した場合は標準出力に出力されます。追加のインクルードディレクトリを参照したい場合は `-I` オプションで指定できます。
+
 ## ライセンス
 
 CC0 1.0 Universal
