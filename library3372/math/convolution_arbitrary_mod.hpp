@@ -38,16 +38,15 @@ std::vector<DynamicModInt<id>> convolution_arbitrary_mod(
 template <typename T>
   requires internal::is_integer_v<T>
 std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
-                                         const std::vector<T>& b,
-                                         long long mod) {
-  assert(mod >= 1);
-  if (mod <= 2147483647LL) {
+                                         const std::vector<T>& b, long long m) {
+  assert(m >= 1);
+  if (m <= 2147483647LL) {
     return internal::convolution_arbitrary_mod32<24, 167772161, 469762049,
-                                                 754974721, T>(a, b, (int)mod);
+                                                 754974721, T>(a, b, (int)m);
   }
   return internal::convolution_arbitrary_mod64<
       24, 2130706433, 2113929217, 2013265921, 1811939329, 1711276033, T>(a, b,
-                                                                         mod);
+                                                                         m);
 }
 
 template <long long m, typename T>

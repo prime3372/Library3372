@@ -18,7 +18,7 @@ std::vector<DynamicModInt<id>> convolution_arbitrary_mod(
 template <typename T>
 std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b,
-                                         long long mod);  // (3)
+                                         long long m);  // (3)
 
 template <long long m, typename T>
 std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
@@ -29,8 +29,7 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
 
 ### 制約
 
-- (1), (4): $m \geq 1$
-- (3): $\mathrm{mod} \geq 1$
+- (1), (3), (4): $m \geq 1$
 - $|a| + |b| - 1 \leq 2^{24}$
 - (3), (4): `T` は整数型
 
