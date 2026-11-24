@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "library3372/internal/math/prime_sieve.hpp"
+#include "library3372/math/isqrt.hpp"
 
 namespace library3372 {
 
@@ -27,7 +28,7 @@ constexpr std::vector<int> enumerate_primes(int n) {
   if (n >= 7) {
     const unsigned long long ur = (unsigned long long)n + 1ULL;
     internal::sieve_primes_wheel30(
-        7ULL, ur, internal::isqrt_u64((unsigned long long)n),
+        7ULL, ur, (unsigned int)isqrt((unsigned long long)n),
         [&](unsigned long long p) { res.push_back((int)p); });
   }
   return res;
