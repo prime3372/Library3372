@@ -46,3 +46,12 @@ jobs:
         run: |
           clang-format --version
           find library3372 tests benchmarks -type f \( -name '*.hpp' -o -name '*.cpp' \) -exec clang-format --dry-run --Werror {} +
+
+  python-test:
+    name: Python Unit Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Python unit tests
+        run: python3 -m unittest discover -s scripts/tests -p '*_test.py' -v
