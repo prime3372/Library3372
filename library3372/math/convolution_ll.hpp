@@ -53,14 +53,14 @@ inline std::vector<long long> convolution_ll(const std::vector<long long>& a,
   constexpr unsigned long long m01_half = m01 >> 1;
 
   std::vector<long long> c((int)s);
-  internal::convolution_garner<m0, m1>([&](int i) { return a[i]; }, n,
-                                    [&](int i) { return b[i]; }, k, (&a == &b),
-                                    [&](int i, const unsigned int* x) {
-                                      unsigned long long val =
-                                          x[0] + (unsigned long long)m0 * x[1];
-                                      if (val > m01_half) val -= m01;
-                                      c[i] = (long long)val;
-                                    });
+  internal::convolution_garner<m0, m1>(
+      [&](int i) { return a[i]; }, n, [&](int i) { return b[i]; }, k,
+      (&a == &b),
+      [&](int i, const unsigned int* x) {
+        unsigned long long val = x[0] + (unsigned long long)m0 * x[1];
+        if (val > m01_half) val -= m01;
+        c[i] = (long long)val;
+      });
   return c;
 }
 
