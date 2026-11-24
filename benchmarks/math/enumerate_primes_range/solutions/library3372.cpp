@@ -9,7 +9,7 @@
 
 #include "library3372/internal/chrono/timer.hpp"
 #include "library3372/internal/hash/hash_combine.hpp"
-#include "library3372/math/enumerate_primes.hpp"
+#include "library3372/math/enumerate_primes_range.hpp"
 
 int main() {
   std::ios::sync_with_stdio(false);
@@ -19,7 +19,7 @@ int main() {
   std::cin >> l >> r;
 
   library3372::internal::Timer timer;
-  std::vector<long long> primes = library3372::enumerate_primes(l, r);
+  std::vector<long long> primes = library3372::enumerate_primes_range(l, r);
   double run_sec = timer.elapsed();
 
   unsigned long long ans_hash = 0;
