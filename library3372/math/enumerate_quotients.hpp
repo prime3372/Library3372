@@ -7,32 +7,15 @@
 #ifndef LIBRARY3372_LIBRARY3372_MATH_ENUMERATE_QUOTIENTS_HPP_
 #define LIBRARY3372_LIBRARY3372_MATH_ENUMERATE_QUOTIENTS_HPP_
 
-#include <bit>
 #include <cassert>
-#include <cmath>
 #include <limits>
 #include <tuple>
-#include <type_traits>
 #include <vector>
+
+#include "library3372/math/isqrt.hpp"
 
 namespace library3372 {
 namespace internal_enumerate_quotients {
-
-constexpr unsigned long long isqrt(unsigned long long n) {
-  if (n <= 1) return n;
-  if (!std::is_constant_evaluated()) {
-    unsigned long long s = (unsigned long long)std::sqrt((double)n);
-    while (s * s > n) --s;
-    while ((s + 1) * (s + 1) <= n) ++s;
-    return s;
-  }
-  unsigned long long x = 1ULL << ((std::bit_width(n) + 1) >> 1);
-  while (true) {
-    unsigned long long nx = (x + n / x) >> 1;
-    if (nx >= x) return x;
-    x = nx;
-  }
-}
 
 template <typename U>
 constexpr void enumerate_quotients_impl(
@@ -61,7 +44,7 @@ enumerate_quotients(long long n) {
   using Result = std::vector<std::tuple<long long, long long, long long>>;
   Result res;
   const unsigned long long u = (unsigned long long)n;
-  const unsigned long long s = internal_enumerate_quotients::isqrt(u);
+  const unsigned long long s = isqrt(u);
   const unsigned long long k = u / (s + 1);
   res.reserve((typename Result::size_type)(s + k));
 
