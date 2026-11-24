@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "library3372/internal/math/ntt.hpp"
+#include "library3372/internal/math/ntt64.hpp"
 #include "library3372/internal/type_traits/is_integer.hpp"
 #include "library3372/math/static_modint.hpp"
 
