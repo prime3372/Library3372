@@ -186,9 +186,34 @@ inline void test_worst_case_max_value() {
          naive_convolution_arbitrary_mod(a, b, INT_MAX));
 }
 
+inline void test_length_over_2_24() {
+  {
+    using Mint = StaticModInt<1000000007>;
+    constexpr int n = (1 << 25) - 1;
+    std::vector<Mint> a(n, Mint::raw(1));
+    std::vector<Mint> b = {Mint::raw(2), Mint::raw(3)};
+    std::vector<Mint> c = convolution_arbitrary_mod(a, b);
+    assert((int)c.size() == (1 << 25));
+    assert(c[0].val() == 2);
+    assert(c[1].val() == 5);
+    assert(c[n - 1].val() == 5);
+    assert(c[n].val() == 3);
+  }
+  {
+    constexpr int n = (1 << 24) + 1;
+    std::vector<long long> a(n, LLONG_MAX - 1);
+    std::vector<long long> b = {2};
+    std::vector<long long> c = convolution_arbitrary_mod(a, b, LLONG_MAX);
+    assert((int)c.size() == n);
+    assert(c[0] == LLONG_MAX - 2);
+    assert(c[n - 1] == LLONG_MAX - 2);
+  }
+}
+
 inline void run_convolution_arbitrary_mod_tests() {
   test_empty_and_small();
   test_worst_case_max_value();
+  test_length_over_2_24();
 
   std::mt19937_64 rng(0x13572468abcdef01ULL);
 

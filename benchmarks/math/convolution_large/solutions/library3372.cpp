@@ -9,7 +9,7 @@
 
 #include "library3372/internal/chrono/timer.hpp"
 #include "library3372/internal/hash/hash_combine.hpp"
-#include "library3372/math/convolution_large.hpp"
+#include "library3372/math/convolution_arbitrary_mod.hpp"
 #include "library3372/math/static_modint.hpp"
 
 int main() {
@@ -32,7 +32,7 @@ int main() {
   }
 
   library3372::internal::Timer timer;
-  std::vector<Mint> c = library3372::convolution_large(a, b);
+  std::vector<Mint> c = library3372::convolution_arbitrary_mod(a, b);
   double run_sec = timer.elapsed();
 
   unsigned long long ans_hash = 0;
