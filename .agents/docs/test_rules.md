@@ -49,7 +49,15 @@
 - 実行時制限時間は 1 個のテストあたり 5.0 秒です。
   - 調査用に `--timeout` オプションを用意していますが、最終的には 5.0 秒に確実に収まるようにしてください。
 
+## スクリプトのテスト
+
+- Python 製スクリプトやツール（`bundle.py` 等）のユニットテストは `scripts/tests/<name>_test.py` に `unittest` で作成します。
+- `scripts/run_all_tests.py` は C++ ユニットテスト専用のため、Python テストは以下で実行してください。
+  ```sh
+  python3 -m unittest discover -s scripts/tests -p '*_test.py'
+  ```
+
 ## CI による確認
 
-- PR 作成時および追加プッシュ時は、GitHub Actions の CI により `tests/` 以下の全テスト（通常実行・サニタイザ付き実行）と `clang-format` チェックが自動実行されます。
+- PR 作成時および追加プッシュ時は、GitHub Actions の CI により `tests/` 以下の全テスト（通常実行・サニタイザ付き実行）、`scripts/tests/` の Python ユニットテスト、`clang-format` チェックが自動実行されます。
 - PR を作成・更新した際は、CI の結果が出るまで待機し、すべてのジョブが成功していることを確認してください。
