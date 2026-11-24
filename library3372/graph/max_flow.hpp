@@ -37,14 +37,13 @@ class MaxFlow {
   explicit MaxFlow(int n) : n_(n) { assert(n >= 0); }
 
   int add_edge(int from, int to, Cap cap) {
+    assert(!flow_called_);
     assert(0 <= from && from < n_);
     assert(0 <= to && to < n_);
     if constexpr (internal::is_signed_integer_v<Cap>) assert(cap >= 0);
-    if (!dirty_) sync_flows();
     int id = (int)edges_.size();
     edges_.push_back({from, to, cap, 0});
     if (cap > 1) all_unit_ = false;
-    dirty_ = true;
     return id;
   }
 
@@ -57,7 +56,7 @@ class MaxFlow {
 
   std::vector<Edge> edges() const {
     std::vector<Edge> result = edges_;
-    if (!dirty_) {
+    if (built_) {
       for (int i = 0; i < (int)result.size(); ++i) {
         result[i].flow = edge_flow(i);
       }
@@ -72,9 +71,10 @@ class MaxFlow {
     assert(0 <= t && t < n_);
     assert(s != t);
     if constexpr (internal::is_signed_integer_v<Cap>) assert(flow_limit >= 0);
+    flow_called_ = true;
     if (flow_limit == 0) return 0;
 
-    if (dirty_ || start_.empty()) build_csr();
+    if (!built_) build_csr();
     if (csr_is_unit_) return flow_unit(s, t, flow_limit);
     return flow_general(s, t, flow_limit);
   }
@@ -83,7 +83,7 @@ class MaxFlow {
     assert(0 <= s && s < n_);
     std::vector<int> level(n_, -1);
     std::vector<int> que(n_);
-    if (!dirty_) {
+    if (built_) {
       if (csr_is_unit_) {
         dinic_bfs(s, -1, ulist_, level, que,
                   [](const UnitEdge& e) { return (e.rev_cap & 1U) != 0; });
@@ -94,8 +94,7 @@ class MaxFlow {
     } else {
       std::vector<std::vector<int>> adj(n_);
       for (const Edge& e : edges_) {
-        if (e.cap - e.flow > 0) adj[e.from].push_back(e.to);
-        if (e.flow > 0) adj[e.to].push_back(e.from);
+        if (e.cap > 0) adj[e.from].push_back(e.to);
       }
       int qh = 0;
       int qt = 0;
@@ -128,16 +127,12 @@ class MaxFlow {
   };
 
   Cap edge_flow(int i) const {
+    if (!built_) return 0;
     const Edge& e = edges_[i];
-    if (dirty_) return e.flow;
     if (csr_is_unit_) {
       return (Cap)(e.cap - (Cap)(ulist_[edge_pos_[i]].rev_cap & 1U));
     }
     return (Cap)(e.cap - elist_[edge_pos_[i]].cap);
-  }
-
-  void sync_flows() {
-    for (int i = 0; i < (int)edges_.size(); ++i) edges_[i].flow = edge_flow(i);
   }
 
   void build_csr() {
@@ -160,15 +155,14 @@ class MaxFlow {
       int vi = cur[e.to]++;
       edge_pos_[i] = ui;
       if (all_unit_) {
-        ulist_[ui] = {e.to,
-                      ((unsigned int)vi << 1) | (unsigned int)(e.cap - e.flow)};
-        ulist_[vi] = {e.from, ((unsigned int)ui << 1) | (unsigned int)e.flow};
+        ulist_[ui] = {e.to, ((unsigned int)vi << 1) | (unsigned int)e.cap};
+        ulist_[vi] = {e.from, (unsigned int)ui << 1};
       } else {
-        elist_[ui] = {e.to, vi, (Cap)(e.cap - e.flow)};
-        elist_[vi] = {e.from, ui, e.flow};
+        elist_[ui] = {e.to, vi, e.cap};
+        elist_[vi] = {e.from, ui, 0};
       }
     }
-    dirty_ = false;
+    built_ = true;
   }
 
   template <typename EdgeT, typename HasCap>
@@ -444,7 +438,8 @@ class MaxFlow {
 
   int n_ = 0;
   bool all_unit_ = true;
-  bool dirty_ = true;
+  bool flow_called_ = false;
+  bool built_ = false;
   bool csr_is_unit_ = false;
   std::vector<Edge> edges_;
   std::vector<int> start_;

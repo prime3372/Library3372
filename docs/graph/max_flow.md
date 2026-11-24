@@ -67,6 +67,7 @@ int MaxFlow::add_edge(int from, int to, Cap cap);
 - $0 \leq \mathrm{from} < n$
 - $0 \leq \mathrm{to} < n$
 - $\mathrm{cap} \geq 0$
+- `flow` を一度も呼び出していない
 
 ### 計算量
 
