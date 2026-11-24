@@ -4,8 +4,8 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP
-#define LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP
+#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP_
+#define LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP_
 
 #include <algorithm>
 #include <bit>
@@ -54,8 +54,8 @@ template <int... Primes> inline constexpr CrtInfo<Primes...> crt_info{};
 // Multi-prime NTT + Garner's CRT reconstruction (1 <= K <= 5 primes < 2^31)
 // https://en.wikipedia.org/wiki/Chinese_remainder_theorem
 template <int... Primes, typename SrcA, typename SrcB, typename ReduceFinal>
-void convolution_garner(SrcA&& get_a, int n, SrcB&& get_b, int k, bool same_input,
-                     ReduceFinal&& reduce_final) {
+void convolution_garner(SrcA&& get_a, int n, SrcB&& get_b, int k,
+                        bool same_input, ReduceFinal&& reduce_final) {
   constexpr int num_primes = sizeof...(Primes);
   const auto& meta = crt_info<Primes...>;
   int s = n + k - 1;
@@ -355,4 +355,4 @@ std::vector<T> convolution_arbitrary_mod64(const std::vector<T>& a,
 
 }  // namespace library3372::internal
 
-#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP
+#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_MATH_CONVOLUTION_GARNER_HPP_
