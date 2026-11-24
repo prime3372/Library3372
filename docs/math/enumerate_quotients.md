@@ -1,6 +1,6 @@
 # 商列挙
 
-非負整数 $n$ に対して $\lfloor n / x \rfloor$ がとり得るすべての値とその値に対応する $x$ の範囲を、計算量 $O(\sqrt{n})$ で列挙します。
+非負整数 $n$ に対して $\lfloor n / x \rfloor$ がとり得るすべての値とその値に対応する $x$ の範囲を $O(\sqrt{n})$ で列挙します。
 
 ## enumerate_quotients
 
