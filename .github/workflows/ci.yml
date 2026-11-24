@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-test:
+    name: Unit Tests (${{ matrix.mode }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: standard
+            args: ""
+          - mode: sanitize
+            args: "--sanitize"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check compiler version
+        run: g++ --version
+
+      - name: Run unit tests (${{ matrix.mode }})
+        run: python3 scripts/run_all_tests.py ${{ matrix.args }}
+
+  clang-format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check clang-format
+        run: |
+          clang-format --version
+          find library3372 tests benchmarks -type f \( -name '*.hpp' -o -name '*.cpp' \) -exec clang-format --dry-run --Werror {} +
