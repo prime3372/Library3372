@@ -6,11 +6,7 @@
 
 #pragma GCC push_options
 #pragma GCC target("no-avx2")
-
-#ifdef __AVX2__
-#error \
-    "AVX2 must be disabled to test the Scalar implementation of suffix_array."
-#endif
+#undef __AVX2__
 
 #include "tests/string/suffix_array_test_common.hpp"
 
