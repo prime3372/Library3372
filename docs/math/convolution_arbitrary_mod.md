@@ -52,7 +52,7 @@ int main() {
 
   std::vector<Mint> a = {1, 2, 3, 4};
   std::vector<Mint> b = {1, 2, 4};
-  for (SMint x : library3372::convolution_arbitrary_mod(a, b)) {
+  for (Mint x : library3372::convolution_arbitrary_mod(a, b)) {
     std::cout << x << " ";
   }
   std::cout << "\n";
