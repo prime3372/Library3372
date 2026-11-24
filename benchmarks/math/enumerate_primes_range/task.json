@@ -1,0 +1,26 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "small_1e9",
+      "generator": "range.cpp",
+      "args": ["1000000000", "1001000000"]
+    },
+    {
+      "name": "medium_1e12",
+      "generator": "range.cpp",
+      "args": ["1000000000000", "1000010000000"]
+    },
+    {
+      "name": "large_1e14",
+      "generator": "range.cpp",
+      "args": ["99999990000000", "100000000000000"]
+    },
+    {
+      "name": "huge_small_len_1e18",
+      "generator": "range.cpp",
+      "args": ["999999999999900000", "1000000000000000000"]
+    }
+  ]
+}

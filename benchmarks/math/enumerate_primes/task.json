@@ -3,29 +3,24 @@
   "timeout_sec": 10.0,
   "cases": [
     {
-      "name": "prefix_1e7",
-      "generator": "query.cpp",
-      "args": ["1", "0", "10000000"]
+      "name": "small_1e5",
+      "generator": "value.cpp",
+      "args": ["100000"]
     },
     {
-      "name": "prefix_1e8",
-      "generator": "query.cpp",
-      "args": ["1", "0", "100000000"]
+      "name": "medium_1e6",
+      "generator": "value.cpp",
+      "args": ["1000000"]
     },
     {
-      "name": "range_1e12",
-      "generator": "query.cpp",
-      "args": ["2", "1000000000000", "1000010000000"]
+      "name": "large_1e7",
+      "generator": "value.cpp",
+      "args": ["10000000"]
     },
     {
-      "name": "range_1e14",
-      "generator": "query.cpp",
-      "args": ["2", "99999990000000", "100000000000000"]
-    },
-    {
-      "name": "range_1e18_small",
-      "generator": "query.cpp",
-      "args": ["2", "999999999999900000", "1000000000000000000"]
+      "name": "xlarge_1e8",
+      "generator": "value.cpp",
+      "args": ["100000000"]
     }
   ]
 }

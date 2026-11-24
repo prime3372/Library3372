@@ -15,29 +15,17 @@ int main() {
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
-  int t;
-  long long l, r;
-  std::cin >> t >> l >> r;
+  int n;
+  std::cin >> n;
+
+  library3372::internal::Timer timer;
+  std::vector<int> primes = library3372::enumerate_primes(n);
+  double run_sec = timer.elapsed();
 
   unsigned long long ans_hash = 0;
-  double run_sec = 0.0;
-
-  if (t == 1) {
-    library3372::internal::Timer timer;
-    std::vector<int> primes = library3372::enumerate_primes((int)r);
-    run_sec = timer.elapsed();
-    for (int p : primes) {
-      ans_hash =
-          library3372::internal::hash_combine(ans_hash, (unsigned long long)p);
-    }
-  } else {
-    library3372::internal::Timer timer;
-    std::vector<long long> primes = library3372::enumerate_primes(l, r);
-    run_sec = timer.elapsed();
-    for (long long p : primes) {
-      ans_hash =
-          library3372::internal::hash_combine(ans_hash, (unsigned long long)p);
-    }
+  for (int p : primes) {
+    ans_hash =
+        library3372::internal::hash_combine(ans_hash, (unsigned long long)p);
   }
 
   std::cout << "hash " << ans_hash << '\n';
