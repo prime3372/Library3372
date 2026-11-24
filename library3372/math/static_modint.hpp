@@ -8,12 +8,10 @@
 #define LIBRARY3372_LIBRARY3372_MATH_STATIC_MODINT_HPP_
 
 #include <cassert>
-#include <charconv>
 #include <istream>
 #include <ostream>
-#include <string>
-#include <utility>
 
+#include "library3372/internal/math/modint_common.hpp"
 #include "library3372/internal/type_traits/is_integer.hpp"
 
 namespace library3372 {
@@ -67,32 +65,11 @@ template <int m> class StaticModInt {
   constexpr int val() const { return (int)val_; }
 
   constexpr StaticModInt pow(long long n) const {
-    assert(n >= 0);
-    StaticModInt x = *this;
-    StaticModInt res = 1;
-    while (n > 0) {
-      if (n & 1) res *= x;
-      x *= x;
-      n >>= 1;
-    }
-    return res;
+    return internal::modint_pow(*this, n);
   }
 
   constexpr StaticModInt inv() const {
-    int s = m;
-    int t = (int)val_;
-    int m0 = 0;
-    int m1 = 1;
-    while (t != 0) {
-      int u = s / t;
-      s -= t * u;
-      m0 -= m1 * u;
-      std::swap(s, t);
-      std::swap(m0, m1);
-    }
-    assert(s == 1);
-    if (m0 < 0) m0 += m;
-    return raw(m0);
+    return internal::modint_inv<StaticModInt>((int)val_, m);
   }
 
   constexpr StaticModInt operator+() const { return *this; }
@@ -174,26 +151,7 @@ template <int m> class StaticModInt {
   }
 
   friend std::istream& operator>>(std::istream& is, StaticModInt& x) {
-    std::string s;
-    is >> s;
-    assert((bool)is);
-    const char* begin = s.data();
-    const char* end = begin + s.size();
-    if (s[0] == '-') {
-      long long v = 0;
-      [[maybe_unused]] std::from_chars_result res =
-          std::from_chars(begin, end, v);
-      assert(res.ec == std::errc() && res.ptr == end);
-      x = v;
-    } else {
-      if (s[0] == '+') ++begin;
-      unsigned long long v = 0;
-      [[maybe_unused]] std::from_chars_result res =
-          std::from_chars(begin, end, v);
-      assert(res.ec == std::errc() && res.ptr == end);
-      x = v;
-    }
-    return is;
+    return internal::modint_istream(is, x);
   }
 
  private:
