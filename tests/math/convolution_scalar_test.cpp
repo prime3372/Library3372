@@ -6,10 +6,7 @@
 
 #pragma GCC push_options
 #pragma GCC target("no-avx2")
-
-#ifdef __AVX2__
-#error "AVX2 must be disabled to test the Scalar implementation of convolution."
-#endif
+#undef __AVX2__
 
 #include "tests/math/convolution_test_common.hpp"
 

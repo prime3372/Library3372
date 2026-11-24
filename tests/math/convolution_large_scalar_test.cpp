@@ -6,6 +6,7 @@
 
 #ifdef __AVX2__
 #pragma GCC target("no-avx2")
+#undef __AVX2__
 #endif
 
 #include "tests/math/convolution_large_test_common.hpp"
