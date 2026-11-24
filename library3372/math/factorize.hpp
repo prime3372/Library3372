@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "library3372/internal/math/montgomery.hpp"
-#include "library3372/internal/random/xorshift.hpp"
 #include "library3372/math/is_prime.hpp"
 
 namespace library3372 {
@@ -30,8 +29,11 @@ inline unsigned long long init_seed() {
 }
 
 inline unsigned long long next_random_u64() {
-  thread_local internal::Xorshift rng(init_seed());
-  return rng();
+  thread_local unsigned long long state = init_seed();
+  state ^= state << 13;
+  state ^= state >> 7;
+  state ^= state << 17;
+  return state;
 }
 
 // Multi-walk Brent's cycle detection variant of Pollard's rho algorithm
