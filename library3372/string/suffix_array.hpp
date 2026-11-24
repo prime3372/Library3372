@@ -28,6 +28,15 @@
 namespace library3372 {
 namespace internal_suffix_array {
 
+using u8 = unsigned char;
+using u16 = unsigned short;
+using u32 = unsigned int;
+using u64 = unsigned long long;
+using i64 = long long;
+using u128 = unsigned __int128;
+template <typename T> using Vec = std::vector<T>;
+using Vi = Vec<int>;
+
 inline constexpr int threshold_naive = 32;
 inline constexpr int tag_bit = (int)0x80000000U;
 inline constexpr int lms_bit = 0x40000000;
@@ -56,19 +65,32 @@ inline void sa_naive(const Seq& s, int n, int* sa,
 }
 
 #ifdef __AVX2__
+using V256 = __m256i;
+using V128 = __m128i;
+
+inline V256 loadu(const void* p) { return _mm256_loadu_si256((const V256*)p); }
+inline void storeu(void* p, V256 v) { _mm256_storeu_si256((V256*)p, v); }
+inline u32 mask32(V256 v) { return (u32)_mm256_movemask_ps((__m256)v); }
+inline V256 perm8(V256 v, V256 p) { return _mm256_permutevar8x32_epi32(v, p); }
+
 struct CompressTable {
-  unsigned char idx[256][8];
+  u8 idx[256][8];
   constexpr CompressTable() : idx{} {
     for (int mask = 0; mask < 256; ++mask) {
       int k = 0;
       for (int b = 0; b < 8; ++b) {
-        if ((mask >> b) & 1) idx[mask][k++] = (unsigned char)b;
+        if ((mask >> b) & 1) idx[mask][k++] = (u8)b;
       }
     }
   }
 };
 
 inline constexpr CompressTable compress_table{};
+
+inline V256 pack8(V256 v, u32 mask) {
+  V128 bytes = _mm_loadl_epi64((const V128*)compress_table.idx[mask]);
+  return perm8(v, _mm256_cvtepu8_epi32(bytes));
+}
 
 inline void set_buckets(const int* cnt, int* bkt, int upper, bool end) {
   if (upper < 64) {
@@ -88,19 +110,18 @@ inline void set_buckets(const int* cnt, int* bkt, int upper, bool end) {
   }
   int n = upper + 1;
   int i = 0;
-  __m256i carry = _mm256_setzero_si256();
+  V256 carry = _mm256_setzero_si256();
   for (; i + 8 <= n; i += 8) {
-    __m256i x = _mm256_loadu_si256((const __m256i*)(cnt + i));
-    __m256i s = _mm256_add_epi32(x, _mm256_slli_si256(x, 4));
+    V256 x = loadu(cnt + i);
+    V256 s = _mm256_add_epi32(x, _mm256_slli_si256(x, 4));
     s = _mm256_add_epi32(s, _mm256_slli_si256(s, 8));
-    __m256i lo_last = _mm256_permute2x128_si256(s, s, 0x08);
-    lo_last = _mm256_shuffle_epi32(lo_last, 0xFF);
+    V256 lo_last =
+        _mm256_shuffle_epi32(_mm256_permute2x128_si256(s, s, 0x08), 0xFF);
     s = _mm256_add_epi32(s, lo_last);
-    __m256i inc = _mm256_add_epi32(s, carry);
-    __m256i res = end ? inc : _mm256_sub_epi32(inc, x);
-    _mm256_storeu_si256((__m256i*)(bkt + i), res);
-    __m256i hi = _mm256_permute2x128_si256(inc, inc, 0x11);
-    carry = _mm256_shuffle_epi32(hi, 0xFF);
+    V256 inc = _mm256_add_epi32(s, carry);
+    storeu(bkt + i, end ? inc : _mm256_sub_epi32(inc, x));
+    carry =
+        _mm256_shuffle_epi32(_mm256_permute2x128_si256(inc, inc, 0x11), 0xFF);
   }
   int sum = _mm256_cvtsi256_si32(carry);
   if (end) {
@@ -120,50 +141,46 @@ template <typename CharT, typename FBlock, typename FTail>
 inline void scan_lms_blocks_avx2(const CharT* s, int n, FBlock&& fn_block,
                                  FTail&& fn_tail) {
   int i = n - 2;
-  unsigned int prev_s = 0;
+  u32 prev_s = 0;
   if constexpr (sizeof(CharT) == 1) {
     if (i >= 31) {
-      const __m256i bias = _mm256_set1_epi8((char)0x80);
-      const __m256i rev16 = _mm256_setr_epi8(
-          15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12,
-          11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+      const V256 bias = _mm256_set1_epi8((char)0x80);
+      const V256 rev16 = _mm256_setr_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
+                                          4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10,
+                                          9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+      auto rev32 = [&](V256 v) {
+        return _mm256_shuffle_epi8(_mm256_permute2x128_si256(v, v, 0x01),
+                                   rev16);
+      };
       for (; i >= 31; i -= 32) {
         int base = i - 31;
-        __m256i v_cur = _mm256_loadu_si256((const __m256i*)(s + base));
-        __m256i v_next = _mm256_loadu_si256((const __m256i*)(s + base + 1));
-        __m256i v_eq = _mm256_cmpeq_epi8(v_cur, v_next);
-        __m256i v_gt = _mm256_cmpgt_epi8(_mm256_xor_si256(v_next, bias),
-                                         _mm256_xor_si256(v_cur, bias));
-        v_eq = _mm256_shuffle_epi8(_mm256_permute2x128_si256(v_eq, v_eq, 0x01),
-                                   rev16);
-        v_gt = _mm256_shuffle_epi8(_mm256_permute2x128_si256(v_gt, v_gt, 0x01),
-                                   rev16);
-        unsigned int eq = (unsigned int)_mm256_movemask_epi8(v_eq);
-        unsigned int gt = (unsigned int)_mm256_movemask_epi8(v_gt);
+        V256 v_cur = loadu(s + base);
+        V256 v_next = loadu(s + base + 1);
+        V256 v_eq = _mm256_cmpeq_epi8(v_cur, v_next);
+        V256 v_gt = _mm256_cmpgt_epi8(_mm256_xor_si256(v_next, bias),
+                                      _mm256_xor_si256(v_cur, bias));
+        u32 eq = (u32)_mm256_movemask_epi8(rev32(v_eq));
+        u32 gt = (u32)_mm256_movemask_epi8(rev32(v_gt));
         // Carry propagation propagates S-type from right (LSB) to left (MSB).
-        unsigned int sum = eq + ((gt << 1) | prev_s);
-        unsigned int s_mask = ((~sum) & eq) | gt;
-        unsigned int lms_mask = (~s_mask) & ((s_mask << 1) | prev_s);
+        u32 sum = eq + ((gt << 1) | prev_s);
+        u32 s_mask = ((~sum) & eq) | gt;
+        u32 lms_mask = (~s_mask) & ((s_mask << 1) | prev_s);
         prev_s = s_mask >> 31;
         fn_block(base + 32, lms_mask);
       }
     }
   } else if constexpr (std::is_same_v<CharT, int>) {
     if (i >= 7) {
-      const __m256i rev8 = _mm256_setr_epi32(7, 6, 5, 4, 3, 2, 1, 0);
+      const V256 rev8 = _mm256_setr_epi32(7, 6, 5, 4, 3, 2, 1, 0);
       for (; i >= 7; i -= 8) {
         int base = i - 7;
-        __m256i v_cur = _mm256_loadu_si256((const __m256i*)(s + base));
-        __m256i v_next = _mm256_loadu_si256((const __m256i*)(s + base + 1));
-        __m256i v_eq = _mm256_permutevar8x32_epi32(
-            _mm256_cmpeq_epi32(v_cur, v_next), rev8);
-        __m256i v_gt = _mm256_permutevar8x32_epi32(
-            _mm256_cmpgt_epi32(v_next, v_cur), rev8);
-        unsigned int eq = (unsigned int)_mm256_movemask_ps((__m256)v_eq);
-        unsigned int gt = (unsigned int)_mm256_movemask_ps((__m256)v_gt);
-        unsigned int sum = eq + ((gt << 1) | prev_s);
-        unsigned int s_mask = (((~sum) & eq) | gt) & 0xFFU;
-        unsigned int lms_mask = ((~s_mask) & ((s_mask << 1) | prev_s)) & 0xFFU;
+        V256 v_cur = loadu(s + base);
+        V256 v_next = loadu(s + base + 1);
+        u32 eq = mask32(perm8(_mm256_cmpeq_epi32(v_cur, v_next), rev8));
+        u32 gt = mask32(perm8(_mm256_cmpgt_epi32(v_next, v_cur), rev8));
+        u32 sum = eq + ((gt << 1) | prev_s);
+        u32 s_mask = (((~sum) & eq) | gt) & 0xFFU;
+        u32 lms_mask = ((~s_mask) & ((s_mask << 1) | prev_s)) & 0xFFU;
         prev_s = s_mask >> 7;
         fn_block(base + 8, lms_mask);
       }
@@ -204,7 +221,7 @@ inline void count_symbols_and_lms(const CharT* s, int n, int upper, int* cnt,
   last_lms = -1;
   scan_lms_blocks_avx2(
       s, n,
-      [&](int end_pos, unsigned int lms_mask) {
+      [&](int end_pos, u32 lms_mask) {
         if (lms_mask) {
           m += std::popcount(lms_mask);
           last_lms = end_pos - (31 - std::countl_zero(lms_mask));
@@ -220,7 +237,7 @@ template <typename CharT, typename F>
 inline void for_each_lms_pos(const CharT* s, int n, F&& fn) {
   scan_lms_blocks_avx2(
       s, n,
-      [&](int end_pos, unsigned int lms_mask) {
+      [&](int end_pos, u32 lms_mask) {
         while (lms_mask) {
           fn(end_pos - std::countr_zero(lms_mask));
           lms_mask &= lms_mask - 1;
@@ -234,16 +251,11 @@ inline void for_each_lms_pos(const CharT* s, int n, F&& fn) {
 inline void compact_lms(int* sa, int n) {
   int k = 0;
   int i = 0;
-  const __m256i clear_lms = _mm256_set1_epi32(~lms_bit);
+  const V256 clear_lms = _mm256_set1_epi32(~lms_bit);
   for (; i + 8 <= n && k + 8 <= n; i += 8) {
-    __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
-    unsigned int mask =
-        (unsigned int)_mm256_movemask_ps((__m256)_mm256_slli_epi32(v, 1));
-    __m128i bytes = _mm_loadl_epi64((const __m128i*)compress_table.idx[mask]);
-    __m256i perm = _mm256_cvtepu8_epi32(bytes);
-    __m256i packed =
-        _mm256_permutevar8x32_epi32(_mm256_and_si256(v, clear_lms), perm);
-    _mm256_storeu_si256((__m256i*)(sa + k), packed);
+    V256 v = loadu(sa + i);
+    u32 mask = mask32(_mm256_slli_epi32(v, 1));
+    storeu(sa + k, pack8(_mm256_and_si256(v, clear_lms), mask));
     k += std::popcount(mask);
   }
   for (; i < n; ++i) {
@@ -258,12 +270,9 @@ inline void compact_rec_s(int* sa, int m, int n) {
   int j = 0;
   int i = m;
   for (; i + 8 <= n; i += 8) {
-    __m256i v = _mm256_loadu_si256((const __m256i*)(sa + i));
-    unsigned int mask = (~(unsigned int)_mm256_movemask_ps((__m256)v)) & 0xFFU;
-    __m128i bytes = _mm_loadl_epi64((const __m128i*)compress_table.idx[mask]);
-    __m256i perm = _mm256_cvtepu8_epi32(bytes);
-    __m256i packed = _mm256_permutevar8x32_epi32(v, perm);
-    _mm256_storeu_si256((__m256i*)(rec_s + j), packed);
+    V256 v = loadu(sa + i);
+    u32 mask = (~mask32(v)) & 0xFFU;
+    storeu(rec_s + j, pack8(v, mask));
     j += std::popcount(mask);
   }
   for (; i < n; ++i) {
@@ -277,25 +286,18 @@ template <typename CharT>
 inline bool lms_substr_diff(const CharT* s, int n, int a, int b, int len) {
   if constexpr (sizeof(CharT) == 1) {
     if (len <= 16 && a + 16 <= n && b + 16 <= n) {
-      __m128i va = _mm_loadu_si128((const __m128i*)(s + a));
-      __m128i vb = _mm_loadu_si128((const __m128i*)(s + b));
-      unsigned int eq = (unsigned int)_mm_movemask_epi8(_mm_cmpeq_epi8(va, vb));
+      V128 va = _mm_loadu_si128((const V128*)(s + a));
+      V128 vb = _mm_loadu_si128((const V128*)(s + b));
+      u32 eq = (u32)_mm_movemask_epi8(_mm_cmpeq_epi8(va, vb));
       return ((~eq) & ((1U << len) - 1U)) != 0;
     }
-    if (len > 16) {
-      return std::memcmp(s + a, s + b, (unsigned long)len) != 0;
-    }
+    if (len > 16) return std::memcmp(s + a, s + b, (u64)len) != 0;
   } else {
     if (len <= 8 && a + 8 <= n && b + 8 <= n) {
-      __m256i va = _mm256_loadu_si256((const __m256i*)(s + a));
-      __m256i vb = _mm256_loadu_si256((const __m256i*)(s + b));
-      unsigned int eq =
-          (unsigned int)_mm256_movemask_ps((__m256)_mm256_cmpeq_epi32(va, vb));
+      u32 eq = mask32(_mm256_cmpeq_epi32(loadu(s + a), loadu(s + b)));
       return ((~eq) & ((1U << len) - 1U)) != 0;
     }
-    if (len > 8) {
-      return std::memcmp(s + a, s + b, (unsigned long)len * sizeof(int)) != 0;
-    }
+    if (len > 8) return std::memcmp(s + a, s + b, (u64)len * sizeof(int)) != 0;
   }
   for (int d = 0; d < len; ++d) {
     if (s[a + d] != s[b + d]) return true;
@@ -374,9 +376,7 @@ inline void compact_rec_s(int* sa, int m, int n) {
 template <typename CharT>
 inline bool lms_substr_diff(const CharT* s, int, int a, int b, int len) {
   if constexpr (sizeof(CharT) == 1) {
-    if (len > 16) {
-      return std::memcmp(s + a, s + b, (unsigned long)len) != 0;
-    }
+    if (len > 16) return std::memcmp(s + a, s + b, (u64)len) != 0;
   }
   for (int d = 0; d < len; ++d) {
     if (s[a + d] != s[b + d]) return true;
@@ -435,9 +435,8 @@ inline void induce_s(const CharT* s, int n, const int* cnt, int* bkt, int upper,
 // SA-IS (Suffix Array - Induced Sorting)
 // https://en.wikipedia.org/wiki/Suffix_array
 template <typename CharT>
-void sa_is_core(const CharT* s, int n, int upper, int* sa,
-                std::vector<int>& cnt_pool, int cnt_offset,
-                std::vector<int>& bkt_vec) {
+void sa_is_core(const CharT* s, int n, int upper, int* sa, Vi& cnt_pool,
+                int cnt_offset, Vi& bkt_vec) {
   if (n == 0) return;
   if (n == 1) {
     sa[0] = 0;
@@ -472,7 +471,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
   count_symbols_and_lms(s, n, upper, cnt, m, last_lms);
   assert(0 <= m && m <= n);
 
-  std::memset(sa, 0xff, (unsigned long)n * sizeof(int));
+  std::memset(sa, 0xff, (u64)n * sizeof(int));
 
   if (m >= 1) {
     set_buckets(cnt, bkt, upper, true);
@@ -495,7 +494,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
 
   // No two adjacent indices can be LMS, so (p >> 1) uniquely maps every LMS
   // position into sa[m .. n - 1] without an external lms_map array.
-  std::memset(sa + m, 0xff, (unsigned long)(n - m) * sizeof(int));
+  std::memset(sa + m, 0xff, (u64)(n - m) * sizeof(int));
   {
     int prev_lms = n;
     for_each_lms_pos(s, n, [&](int p) {
@@ -535,7 +534,7 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
     bkt = bkt_vec.data();
   }
 
-  std::memset(sa + m, 0xff, (unsigned long)(n - m) * sizeof(int));
+  std::memset(sa + m, 0xff, (u64)(n - m) * sizeof(int));
   set_buckets(cnt, bkt, upper, true);
   for (int i = m - 1; i >= 0; --i) {
     int p = sa[i];
@@ -547,22 +546,34 @@ void sa_is_core(const CharT* s, int n, int upper, int* sa,
   induce_s<false>(s, n, cnt, bkt, upper, sa);
 }
 
+template <typename CharT>
+inline Vi run_sa_is(const CharT* s, int n, int upper, int cnt_cap,
+                    int bkt_cap) {
+  Vi sa(n);
+  Vi cnt_pool;
+  Vi bkt;
+  cnt_pool.reserve(cnt_cap);
+  bkt.reserve(bkt_cap);
+  sa_is_core(s, n, upper, sa.data(), cnt_pool, 0, bkt);
+  return sa;
+}
+
 template <typename U> inline int bit_width_u(U x) {
-  if constexpr (sizeof(U) <= sizeof(unsigned long long)) {
+  if constexpr (sizeof(U) <= sizeof(u64)) {
     return std::bit_width(x);
   } else {
-    unsigned long long hi = (unsigned long long)(x >> 64);
+    u64 hi = (u64)(x >> 64);
     if (hi != 0) return 64 + std::bit_width(hi);
-    return std::bit_width((unsigned long long)x);
+    return std::bit_width((u64)x);
   }
 }
 
 template <typename T, typename U>
-std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
+Vi suffix_array_radix(const Vec<T>& s, T min_v, U range) {
   int n = (int)s.size();
   constexpr int bits = 10;
   constexpr int radix = 1 << bits;
-  constexpr unsigned int mask = radix - 1;
+  constexpr u32 mask = radix - 1;
   int total_bits = bit_width_u(range);
   int passes = (total_bits + bits - 1) / bits;
 
@@ -570,15 +581,15 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
     U key;
     int idx;
   };
-  std::vector<Item> buf_a(n);
-  std::vector<Item> buf_b(n);
-  std::vector<int> counts(passes * radix, 0);
+  Vec<Item> buf_a(n);
+  Vec<Item> buf_b(n);
+  Vi counts(passes * radix, 0);
 
   for (int i = 0; i < n; ++i) {
     U k = (U)s[i] - (U)min_v;
     buf_a[i] = {k, i};
     for (int p = 0; p < passes; ++p) {
-      ++counts[p * radix + (int)((unsigned int)(k >> (p * bits)) & mask)];
+      ++counts[p * radix + (int)((u32)(k >> (p * bits)) & mask)];
     }
   }
   for (int p = 0; p < passes; ++p) {
@@ -597,13 +608,13 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
     int* c = counts.data() + p * radix;
     int shift = p * bits;
     for (int i = 0; i < n; ++i) {
-      unsigned int d = (unsigned int)(src[i].key >> shift) & mask;
+      u32 d = (u32)(src[i].key >> shift) & mask;
       dst[c[d]++] = src[i];
     }
     std::swap(src, dst);
   }
 
-  std::vector<int> sa(n);
+  Vi sa(n);
   int dup_count = 0;
   for (int i = 1; i < n; ++i) dup_count += (src[i].key == src[i - 1].key);
   if (dup_count <= 256) {
@@ -628,30 +639,24 @@ std::vector<int> suffix_array_radix(const std::vector<T>& s, T min_v, U range) {
     return sa;
   }
 
-  std::vector<int> s2(n);
+  Vi s2(n);
   int now = 0;
   s2[src[0].idx] = 0;
   for (int i = 1; i < n; ++i) {
     if (src[i].key != src[i - 1].key) ++now;
     s2[src[i].idx] = now;
   }
-  std::vector<int> cnt_pool;
-  std::vector<int> bkt;
-  cnt_pool.reserve(now + 1 + n / 2);
-  bkt.reserve(now + 1);
-  sa_is_core(s2.data(), n, now, sa.data(), cnt_pool, 0, bkt);
-  return sa;
+  return run_sa_is(s2.data(), n, now, now + 1 + n / 2, now + 1);
 }
 
 template <typename T, typename Compare>
-std::vector<int> suffix_array_compress_sort(const std::vector<T>& s,
-                                            Compare compare) {
+Vi suffix_array_compress_sort(const Vec<T>& s, Compare compare) {
   int n = (int)s.size();
-  std::vector<int> idx(n);
+  Vi idx(n);
   std::iota(idx.begin(), idx.end(), 0);
   std::sort(idx.begin(), idx.end(),
             [&](int l, int r) { return compare(s[l], s[r]); });
-  std::vector<int> s2(n);
+  Vi s2(n);
   int now = 0;
   s2[idx[0]] = 0;
   for (int i = 1; i < n; ++i) {
@@ -659,71 +664,11 @@ std::vector<int> suffix_array_compress_sort(const std::vector<T>& s,
     s2[idx[i]] = now;
   }
   if (now == n - 1) return idx;
-  std::vector<int> sa(n);
-  std::vector<int> cnt_pool;
-  std::vector<int> bkt;
-  cnt_pool.reserve(now + 1 + n / 2);
-  bkt.reserve(now + 1);
-  sa_is_core(s2.data(), n, now, sa.data(), cnt_pool, 0, bkt);
-  return sa;
+  return run_sa_is(s2.data(), n, now, now + 1 + n / 2, now + 1);
 }
 
-}  // namespace internal_suffix_array
-
-inline std::vector<int> suffix_array(const std::vector<int>& s, int upper) {
-  assert(upper >= 0);
-  for (int d : s) assert((unsigned int)d <= (unsigned int)upper);
-  int n = (int)s.size();
-  assert(n < (1 << 30));
-  if (n == 0) return {};
-  std::vector<int> sa(n);
-  if (n <= internal_suffix_array::threshold_naive) {
-    internal_suffix_array::sa_naive(s.data(), n, sa.data());
-    return sa;
-  }
-  if (upper > 4096 && upper > (long long)n * 8) {
-    return internal_suffix_array::suffix_array_radix(s, 0, (unsigned int)upper);
-  }
-  std::vector<int> cnt_pool;
-  std::vector<int> bkt;
-  cnt_pool.reserve(upper + 1 + n / 2);
-  bkt.reserve(upper + 1);
-  if (upper <= 255 && n >= 4096) {
-    std::vector<unsigned char> s2(n);
-    for (int i = 0; i < n; ++i) s2[i] = (unsigned char)s[i];
-    internal_suffix_array::sa_is_core(s2.data(), n, upper, sa.data(), cnt_pool,
-                                      0, bkt);
-    return sa;
-  }
-  internal_suffix_array::sa_is_core(s.data(), n, upper, sa.data(), cnt_pool, 0,
-                                    bkt);
-  return sa;
-}
-
-inline std::vector<int> suffix_array(std::string_view s) {
-  int n = (int)s.size();
-  assert(n < (1 << 30));
-  if (n == 0) return {};
-  std::vector<int> sa(n);
-  const unsigned char* p = (const unsigned char*)s.data();
-  if (n <= internal_suffix_array::threshold_naive) {
-    internal_suffix_array::sa_naive(p, n, sa.data());
-    return sa;
-  }
-  std::vector<int> cnt_pool;
-  std::vector<int> bkt;
-  cnt_pool.reserve(256 + n);
-  bkt.reserve(n);
-  internal_suffix_array::sa_is_core(p, n, 255, sa.data(), cnt_pool, 0, bkt);
-  return sa;
-}
-
-template <typename T, typename Compare = std::less<>>
-  requires requires(Compare& cmp, const T& a, const T& b) {
-    { cmp(a, b) } -> std::convertible_to<bool>;
-  }
-std::vector<int> suffix_array(const std::vector<T>& s,
-                              Compare compare = Compare{}) {
+template <typename T, typename Compare>
+Vi suffix_array_impl(const Vec<T>& s, Compare compare) {
   int n = (int)s.size();
   assert(n < (1 << 30));
   if (n == 0) return {};
@@ -732,55 +677,38 @@ std::vector<int> suffix_array(const std::vector<T>& s,
       std::is_same_v<std::decay_t<Compare>, std::less<>> ||
       std::is_same_v<std::decay_t<Compare>, std::less<T>>;
   if constexpr (std::is_same_v<T, bool>) {
-    if (n <= internal_suffix_array::threshold_naive) {
-      std::vector<int> sa(n);
-      internal_suffix_array::sa_naive(s, n, sa.data(), compare);
+    if (n <= threshold_naive) {
+      Vi sa(n);
+      sa_naive(s, n, sa.data(), compare);
       return sa;
     }
     if constexpr (is_default_less) {
-      std::vector<unsigned char> s2(n);
-      for (int i = 0; i < n; ++i) s2[i] = (unsigned char)s[i];
-      std::vector<int> sa(n);
-      std::vector<int> cnt_pool;
-      std::vector<int> bkt;
-      cnt_pool.reserve(2 + n);
-      bkt.reserve(n);
-      internal_suffix_array::sa_is_core(s2.data(), n, 1, sa.data(), cnt_pool, 0,
-                                        bkt);
-      return sa;
+      Vec<u8> s2(n);
+      for (int i = 0; i < n; ++i) s2[i] = (u8)s[i];
+      return run_sa_is(s2.data(), n, 1, 2 + n, n);
     } else {
-      return internal_suffix_array::suffix_array_compress_sort(s, compare);
+      return suffix_array_compress_sort(s, compare);
     }
   } else {
-    if (n <= internal_suffix_array::threshold_naive) {
-      std::vector<int> sa(n);
-      internal_suffix_array::sa_naive(s.data(), n, sa.data(), compare);
+    if (n <= threshold_naive) {
+      Vi sa(n);
+      sa_naive(s.data(), n, sa.data(), compare);
       return sa;
     }
     if constexpr (is_default_less && internal::is_integer_v<T>) {
       if constexpr (sizeof(T) == 1) {
-        std::vector<int> sa(n);
-        std::vector<int> cnt_pool;
-        std::vector<int> bkt;
-        cnt_pool.reserve(256 + n);
-        bkt.reserve(n);
         if constexpr (std::is_unsigned_v<T>) {
-          internal_suffix_array::sa_is_core((const unsigned char*)s.data(), n,
-                                            255, sa.data(), cnt_pool, 0, bkt);
+          return run_sa_is((const u8*)s.data(), n, 255, 256 + n, n);
         } else {
-          std::vector<unsigned char> s2(n);
-          for (int i = 0; i < n; ++i) s2[i] = (unsigned char)((int)s[i] + 128);
-          internal_suffix_array::sa_is_core(s2.data(), n, 255, sa.data(),
-                                            cnt_pool, 0, bkt);
+          Vec<u8> s2(n);
+          for (int i = 0; i < n; ++i) s2[i] = (u8)((int)s[i] + 128);
+          return run_sa_is(s2.data(), n, 255, 256 + n, n);
         }
-        return sa;
       } else {
         using U = std::conditional_t<
-            sizeof(T) == 2, unsigned short,
-            std::conditional_t<
-                sizeof(T) == 4, unsigned int,
-                std::conditional_t<sizeof(T) == 8, unsigned long long,
-                                   unsigned __int128>>>;
+            sizeof(T) == 2, u16,
+            std::conditional_t<sizeof(T) == 4, u32,
+                               std::conditional_t<sizeof(T) == 8, u64, u128>>>;
         T min_v = s[0];
         T max_v = s[0];
         for (int i = 1; i < n; ++i) {
@@ -789,48 +717,85 @@ std::vector<int> suffix_array(const std::vector<T>& s,
         }
         U range = (U)max_v - (U)min_v;
         if (range == 0) {
-          std::vector<int> sa(n);
+          Vi sa(n);
           for (int i = 0; i < n; ++i) sa[i] = n - 1 - i;
           return sa;
         }
-        if (range <= (U)std::max((long long)n * 2, 4096LL)) {
-          std::vector<int> sa(n);
-          std::vector<int> cnt_pool;
-          std::vector<int> bkt;
+        if (range <= (U)std::max((i64)n * 2, 4096LL)) {
           int upper = (int)range;
-          cnt_pool.reserve(upper + 1 + n / 2);
-          bkt.reserve(upper + 1);
+          int cnt_cap = upper + 1 + n / 2;
+          int bkt_cap = upper + 1;
           if (range <= 255) {
-            std::vector<unsigned char> s2(n);
-            for (int i = 0; i < n; ++i) {
-              s2[i] = (unsigned char)((U)s[i] - (U)min_v);
-            }
-            internal_suffix_array::sa_is_core(s2.data(), n, upper, sa.data(),
-                                              cnt_pool, 0, bkt);
-            return sa;
+            Vec<u8> s2(n);
+            for (int i = 0; i < n; ++i) s2[i] = (u8)((U)s[i] - (U)min_v);
+            return run_sa_is(s2.data(), n, upper, cnt_cap, bkt_cap);
           }
           if constexpr (std::is_same_v<T, int>) {
             if (min_v == 0) {
-              internal_suffix_array::sa_is_core(s.data(), n, upper, sa.data(),
-                                                cnt_pool, 0, bkt);
-              return sa;
+              return run_sa_is(s.data(), n, upper, cnt_cap, bkt_cap);
             }
           }
-          std::vector<int> s2(n);
+          Vi s2(n);
           for (int i = 0; i < n; ++i) s2[i] = (int)((U)s[i] - (U)min_v);
-          internal_suffix_array::sa_is_core(s2.data(), n, upper, sa.data(),
-                                            cnt_pool, 0, bkt);
-          return sa;
+          return run_sa_is(s2.data(), n, upper, cnt_cap, bkt_cap);
         }
-        if (n >= 256) {
-          return internal_suffix_array::suffix_array_radix(s, min_v, range);
-        }
-        return internal_suffix_array::suffix_array_compress_sort(s, compare);
+        if (n >= 256) return suffix_array_radix(s, min_v, range);
+        return suffix_array_compress_sort(s, compare);
       }
     } else {
-      return internal_suffix_array::suffix_array_compress_sort(s, compare);
+      return suffix_array_compress_sort(s, compare);
     }
   }
+}
+
+}  // namespace internal_suffix_array
+
+inline std::vector<int> suffix_array(const std::vector<int>& s, int upper) {
+  namespace isa = internal_suffix_array;
+  assert(upper >= 0);
+  for (int d : s) assert((isa::u32)d <= (isa::u32)upper);
+  int n = (int)s.size();
+  assert(n < (1 << 30));
+  if (n == 0) return {};
+  if (n <= isa::threshold_naive) {
+    isa::Vi sa(n);
+    isa::sa_naive(s.data(), n, sa.data());
+    return sa;
+  }
+  if (upper > 4096 && upper > (isa::i64)n * 8) {
+    return isa::suffix_array_radix(s, 0, (isa::u32)upper);
+  }
+  int cnt_cap = upper + 1 + n / 2;
+  int bkt_cap = upper + 1;
+  if (upper <= 255 && n >= 4096) {
+    isa::Vec<isa::u8> s2(n);
+    for (int i = 0; i < n; ++i) s2[i] = (isa::u8)s[i];
+    return isa::run_sa_is(s2.data(), n, upper, cnt_cap, bkt_cap);
+  }
+  return isa::run_sa_is(s.data(), n, upper, cnt_cap, bkt_cap);
+}
+
+inline std::vector<int> suffix_array(std::string_view s) {
+  namespace isa = internal_suffix_array;
+  int n = (int)s.size();
+  assert(n < (1 << 30));
+  if (n == 0) return {};
+  const isa::u8* p = (const isa::u8*)s.data();
+  if (n <= isa::threshold_naive) {
+    isa::Vi sa(n);
+    isa::sa_naive(p, n, sa.data());
+    return sa;
+  }
+  return isa::run_sa_is(p, n, 255, 256 + n, n);
+}
+
+template <typename T, typename Compare = std::less<>>
+  requires requires(Compare& cmp, const T& a, const T& b) {
+    { cmp(a, b) } -> std::convertible_to<bool>;
+  }
+std::vector<int> suffix_array(const std::vector<T>& s,
+                              Compare compare = Compare{}) {
+  return internal_suffix_array::suffix_array_impl(s, compare);
 }
 
 }  // namespace library3372
