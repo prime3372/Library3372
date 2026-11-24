@@ -270,22 +270,16 @@ void test_copy_move_and_incremental() {
   assert(copy_mf.flow(0, 3) == 3);
   verify_flow_and_cut(4, 0, 3, added, copy_mf, 9LL, true);
 
-  // Add another edge after flow and augment more.
-  mf.add_edge(1, 2, 5);
-  added.push_back({{1, 2}, 5});
-  assert(mf.flow(0, 3) == 5);
-  verify_flow_and_cut(4, 0, 3, added, mf, 14LL, true);
-
   // Push flow in reverse direction (t -> s) cancels existing flow.
   assert(mf.flow(3, 0, 4) == 4);
-  verify_flow_and_cut(4, 0, 3, added, mf, 10LL, false);
+  verify_flow_and_cut(4, 0, 3, added, mf, 5LL, false);
 
   // Move construction and assignment.
   MaxFlow<long long> moved_mf(std::move(mf));
-  verify_flow_and_cut(4, 0, 3, added, moved_mf, 10LL, false);
+  verify_flow_and_cut(4, 0, 3, added, moved_mf, 5LL, false);
   MaxFlow<long long> move_assign_mf;
   move_assign_mf = std::move(moved_mf);
-  verify_flow_and_cut(4, 0, 3, added, move_assign_mf, 10LL, false);
+  verify_flow_and_cut(4, 0, 3, added, move_assign_mf, 5LL, false);
 
   // Self-move and reuse of moved-from object.
   MaxFlow<long long>& move_self_ref = move_assign_mf;
@@ -309,7 +303,7 @@ void test_special_and_boundary_cases() {
     assert((mf.min_cut(0) == std::vector<bool>{true, true, false, false}));
   }
 
-  // Unit-capacity partial flow, min_cut while dirty, then upgrading to > 1 cap.
+  // Unit-capacity partial flow and full flow.
   {
     MaxFlow<int> mf(4);
     std::vector<std::pair<std::pair<int, int>, int>> added = {
@@ -319,12 +313,6 @@ void test_special_and_boundary_cases() {
     verify_flow_and_cut(4, 0, 3, added, mf, 1, false);
     assert(mf.flow(0, 3) == 1);
     verify_flow_and_cut(4, 0, 3, added, mf, 2, true);
-
-    mf.add_edge(0, 3, 5);
-    added.push_back({{0, 3}, 5});
-    assert((mf.min_cut(0) == std::vector<bool>{true, true, true, true}));
-    assert(mf.flow(0, 3) == 5);
-    verify_flow_and_cut(4, 0, 3, added, mf, 7, true);
   }
 
   // Self-loops, zero-capacity edges, and parallel edges.
@@ -451,7 +439,7 @@ void test_random_against_naive(std::mt19937_64& rng, int n, int m,
   int t = vdist(rng);
   while (t == s) t = vdist(rng);
 
-  // Test partial limit first, then full flow, then extra edges.
+  // Test partial limit first, then full flow.
   long long limit1 = cdist(rng);
   long long f1 = mf.flow(s, t, limit1);
   long long nf1 = naive.flow(s, t, limit1);
@@ -462,19 +450,6 @@ void test_random_against_naive(std::mt19937_64& rng, int n, int m,
   long long nf2 = naive.flow(s, t, (1LL << 62));
   assert(f2 == nf2);
   verify_flow_and_cut(n, s, t, added, mf, f1 + f2, true);
-
-  for (int i = 0; i < 3; ++i) {
-    int u = vdist(rng);
-    int v = vdist(rng);
-    long long c = cdist(rng);
-    mf.add_edge(u, v, c);
-    naive.add_edge(u, v, c);
-    added.push_back({{u, v}, c});
-  }
-  long long f3 = mf.flow(s, t);
-  long long nf3 = naive.flow(s, t, (1LL << 62));
-  assert(f3 == nf3);
-  verify_flow_and_cut(n, s, t, added, mf, f1 + f2 + f3, true);
 }
 
 void test_random_medium(std::mt19937_64& rng, int n, int m, long long max_c) {
