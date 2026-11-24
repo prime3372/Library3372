@@ -11,13 +11,20 @@
 #include <bit>
 #include <cassert>
 #include <numeric>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "library3372/internal/random/xorshift.hpp"
 #include "library3372/math/is_prime.hpp"
 
 namespace library3372 {
 namespace internal_factorize {
+
+inline unsigned long long next_random_u64() {
+  thread_local internal::Xorshift rng;
+  return rng();
+}
 
 // 64-bit Montgomery arithmetic without R^2 precomputation for Pollard's rho
 // https://en.wikipedia.org/wiki/Montgomery_modular_multiplication
@@ -61,79 +68,79 @@ struct Mont64Rho {
 // Multi-walk Brent's cycle detection variant of Pollard's rho algorithm
 // https://en.wikipedia.org/wiki/Pollard%27s_rho_algorithm
 template <bool Lazy, int Walks, int Lim>
-constexpr unsigned long long pollard_rho_impl(unsigned long long n) {
+constexpr unsigned long long pollard_rho_impl(unsigned long long n,
+                                              unsigned long long c_init,
+                                              unsigned long long y_init) {
+  static_assert(Walks == 1 || Walks == 2);
   const Mont64Rho mont(n);
-  auto for_walks = [&](auto&& fn) constexpr {
-    [&]<int... Ws>(std::integer_sequence<int, Ws...>) {
-      (fn(std::integral_constant<int, Ws>{}), ...);
-    }(std::make_integer_sequence<int, Walks>{});
+  unsigned long long c0 = c_init;
+  unsigned long long c1 = (Walks == 2) ? mont.add(c0, mont.one) : 0ULL;
+
+  auto advance = [&](unsigned long long& y, unsigned long long c) {
+    if constexpr (Lazy) {
+      y = mont.mul_2m(y, y) + c;
+      if (y >= mont.mod2) y -= mont.mod2;
+    } else {
+      y = mont.add(mont.mul(y, y), c);
+    }
   };
 
-  unsigned long long c[Walks] = {};
-  c[0] = mont.one;
-  for (int w = 1; w < Walks; ++w) c[w] = mont.add(c[w - 1], mont.one);
-
   for (;;) {
-    unsigned long long y[Walks] = {};
-    unsigned long long q[Walks] = {};
-    y[0] = mont.add(mont.one, mont.one);
-    q[0] = mont.one;
-    for (int w = 1; w < Walks; ++w) {
-      y[w] = mont.add(y[w - 1], mont.one);
-      q[w] = mont.one;
-    }
+    unsigned long long y0 = y_init;
+    unsigned long long y1 = (Walks == 2) ? mont.add(y0, mont.one) : 0ULL;
+    unsigned long long q = mont.one;
     unsigned long long g = 1;
     unsigned long long r = 1;
     while (g == 1) {
-      unsigned long long x[Walks] = {};
-      for_walks([&](auto w) { x[w] = y[w]; });
+      const unsigned long long x0 = y0;
+      const unsigned long long x1 = y1;
       unsigned long long k = 0;
       while (k < r && g == 1) {
-        unsigned long long ys[Walks] = {};
-        for_walks([&](auto w) { ys[w] = y[w]; });
+        const unsigned long long ys0 = y0;
+        const unsigned long long ys1 = y1;
         const unsigned long long lim =
             (r - k < (unsigned long long)Lim ? r - k : (unsigned long long)Lim);
         for (unsigned long long i = 0; i < lim; ++i) {
-          for_walks([&](auto w) {
+          advance(y0, c0);
+          const unsigned long long d0 = x0 > y0 ? x0 - y0 : y0 - x0;
+          if constexpr (Walks == 2) {
+            advance(y1, c1);
+            const unsigned long long d1 = x1 > y1 ? x1 - y1 : y1 - x1;
             if constexpr (Lazy) {
-              y[w] = mont.mul_2m(y[w], y[w]) + c[w];
-              if (y[w] >= mont.mod2) y[w] -= mont.mod2;
-              const unsigned long long diff =
-                  x[w] > y[w] ? x[w] - y[w] : y[w] - x[w];
-              q[w] = mont.mul_2m(q[w], diff);
+              q = mont.mul_2m(q, mont.mul_2m(d0, d1));
             } else {
-              y[w] = mont.add(mont.mul(y[w], y[w]), c[w]);
-              const unsigned long long diff =
-                  x[w] > y[w] ? x[w] - y[w] : y[w] - x[w];
-              q[w] = mont.mul(q[w], diff);
+              q = mont.mul(q, mont.mul(d0, d1));
             }
-          });
+          } else {
+            if constexpr (Lazy) {
+              q = mont.mul_2m(q, d0);
+            } else {
+              q = mont.mul(q, d0);
+            }
+          }
         }
-        unsigned long long prod = q[0];
-        for (int w = 1; w < Walks; ++w) {
-          prod = Lazy ? mont.mul_2m(prod, q[w]) : mont.mul(prod, q[w]);
-        }
-        g = std::gcd(prod, n);
+        g = std::gcd(q, n);
         k += lim;
         if (g == n) {
-          for_walks([&](auto w) { y[w] = ys[w]; });
+          y0 = ys0;
+          y1 = ys1;
           for (unsigned long long i = 0; i < lim; ++i) {
-            for (int w = 0; w < Walks; ++w) {
-              if constexpr (Lazy) {
-                y[w] = mont.mul_2m(y[w], y[w]) + c[w];
-                if (y[w] >= mont.mod2) y[w] -= mont.mod2;
-              } else {
-                y[w] = mont.add(mont.mul(y[w], y[w]), c[w]);
-              }
-              const unsigned long long diff =
-                  x[w] > y[w] ? x[w] - y[w] : y[w] - x[w];
-              g = std::gcd(diff, n);
+            advance(y0, c0);
+            const unsigned long long d0 = x0 > y0 ? x0 - y0 : y0 - x0;
+            g = std::gcd(d0, n);
+            if (g != 1) {
+              if (g < n) return g;
+              break;
+            }
+            if constexpr (Walks == 2) {
+              advance(y1, c1);
+              const unsigned long long d1 = x1 > y1 ? x1 - y1 : y1 - x1;
+              g = std::gcd(d1, n);
               if (g != 1) {
                 if (g < n) return g;
                 break;
               }
             }
-            if (g != 1) break;
           }
           break;
         }
@@ -141,16 +148,30 @@ constexpr unsigned long long pollard_rho_impl(unsigned long long n) {
       r <<= 1;
     }
     if (g > 1 && g < n) return g;
-    c[0] = mont.add(c[Walks - 1], mont.one);
-    for (int w = 1; w < Walks; ++w) c[w] = mont.add(c[w - 1], mont.one);
+    if constexpr (Walks == 2) {
+      c0 = mont.add(c1, mont.one);
+      c1 = mont.add(c0, mont.one);
+    } else {
+      c0 = mont.add(c0, mont.one);
+    }
   }
 }
 
 constexpr unsigned long long pollard_rho(unsigned long long n) {
   if ((n & 1ULL) == 0) return 2;
-  if (n < (1ULL << 32)) return pollard_rho_impl<true, 1, 64>(n);
-  if (n < (1ULL << 62)) return pollard_rho_impl<true, 3, 512>(n);
-  return pollard_rho_impl<false, 3, 512>(n);
+  unsigned long long c_init = 1;
+  unsigned long long y_init = 2;
+  if (!std::is_constant_evaluated() && n >= (1ULL << 32)) {
+    c_init = next_random_u64() % (n - 1) + 1;
+    y_init = next_random_u64() % (n - 1) + 1;
+  }
+  if (n < (1ULL << 32)) {
+    return pollard_rho_impl<true, 1, 64>(n, c_init, y_init);
+  }
+  if (n < (1ULL << 62)) {
+    return pollard_rho_impl<true, 2, 512>(n, c_init, y_init);
+  }
+  return pollard_rho_impl<false, 2, 512>(n, c_init, y_init);
 }
 
 constexpr void factor_odd(unsigned long long n, bool known_composite,

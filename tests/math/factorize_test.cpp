@@ -128,6 +128,9 @@ void test_special_cases() {
   };
   for (long long x : special) verify_factorization(x);
 
+  // Large semiprimes near 10^18 and near LLONG_MAX
+  for (int i = 0; i < 10; ++i) verify_factorization(999381247093216751LL);
+
   // Large primes and near LLONG_MAX
   verify_factorization((1LL << 61) - 1);
   verify_factorization(9223372036854775783LL);
