@@ -170,6 +170,16 @@ template <typename Mint> void test_modulus_boundaries(int m) {
   assert(in[9] == Mint(LLONG_MAX));
   assert(in[10] == Mint(ULLONG_MAX));
   assert(in[11] == Mint(ULLONG_MAX));
+
+  Mint extra;
+  assert(!(iss >> extra));
+
+  std::istringstream iss_loop("10 20 30");
+  int count = 0;
+  Mint val;
+  while (iss_loop >> val) ++count;
+  assert(count == 3);
+  assert(val == Mint(30));
 }
 
 template <typename Mint>
