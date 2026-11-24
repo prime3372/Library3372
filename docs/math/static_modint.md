@@ -293,7 +293,7 @@ std::ostream& operator<<(std::ostream& os, StaticModInt x);
 std::istream& operator>>(std::istream& is, StaticModInt& x);
 ```
 
-入力ストリーム `is` から空白区切りで文字列を 1 つ読み込み、10 進表記の整数として解釈した値を法 $m$ で割った余りで `x` を更新します。
+入力ストリーム `is` から空白区切りで文字列を 1 つ読み込み、10 進表記の整数として解釈した値を法 $m$ で割った余りで `x` を更新します。読み込みに失敗した場合は、`x` を更新せずに `is` をそのまま返します。
 
 ### 制約
 
