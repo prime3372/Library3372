@@ -94,6 +94,10 @@ void test_boundaries_and_multi_segment() {
   assert(enumerate_primes_range(9999999995000LL, 10000000000000LL) ==
          reference_range(9999999995000LL, 10000000000000LL));
 
+  // is_prime fallback path for narrow range with limit <= 10^6 (r = 10^12, len = 10)
+  assert(enumerate_primes_range(999999999990LL, 1000000000000LL) ==
+         reference_range(999999999990LL, 1000000000000LL));
+
   // Near LLONG_MAX
   assert(enumerate_primes_range(LLONG_MAX - 5000LL, LLONG_MAX) ==
          reference_range(LLONG_MAX - 5000LL, LLONG_MAX));

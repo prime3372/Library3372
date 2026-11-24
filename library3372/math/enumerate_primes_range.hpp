@@ -12,6 +12,7 @@
 
 #include "library3372/internal/math/prime_sieve.hpp"
 #include "library3372/math/is_prime.hpp"
+#include "library3372/math/isqrt.hpp"
 
 namespace library3372 {
 
@@ -31,9 +32,9 @@ constexpr std::vector<long long> enumerate_primes_range(long long l,
       (unsigned long long)l < 7ULL ? 7ULL : (unsigned long long)l;
   const unsigned long long ur = (unsigned long long)r;
   if (ul < ur) {
-    const unsigned int limit = internal::isqrt_u64(ur - 1ULL);
+    const unsigned int limit = (unsigned int)isqrt(ur - 1ULL);
     const bool use_is_prime =
-        limit > 1000000U && (unsigned long long)limit > (ur - ul) * 32ULL;
+        limit > 1000U && (unsigned long long)limit > (ur - ul) * 32ULL;
     if (use_is_prime) {
       internal::sieve_primes_wheel30(ul, ur, 1000U, [&](unsigned long long p) {
         if (is_prime((long long)p)) res.push_back((long long)p);
