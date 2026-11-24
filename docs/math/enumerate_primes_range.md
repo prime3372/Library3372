@@ -16,7 +16,7 @@ std::vector<long long> enumerate_primes_range(long long l, long long r);
 
 ### 計算量
 
-- 時間 $O(\min((r - l + \sqrt{r}) \log \log r, (r - l) \log r))$
+- 時間 $O(\min((r - l + \sqrt{r}) \log \log r, (r - l) \log r))$ 空間 $O((r - l) / \log r)$
 
 ## 使用例
 
