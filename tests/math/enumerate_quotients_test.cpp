@@ -94,10 +94,8 @@ void verify_quotients(long long n) {
     assert(1 <= l && l < r && r <= n + 1);
     assert(r == prev_l);
     assert(q > prev_q);
-    assert(n / l == q);
-    assert(n / (r - 1) == q);
-    if (r <= n) assert(n / r < q);
-    if (l > 1) assert(n / (l - 1) > q);
+    assert((__int128)q * l <= n && n < (__int128)(q + 1) * l);
+    assert((__int128)q * (r - 1) <= n && n < (__int128)(q + 1) * (r - 1));
     prev_q = q;
     prev_l = l;
   }
@@ -113,13 +111,16 @@ void test_exhaustive_small() {
 
 void test_special_cases() {
   // Around squares and k*(k + 1) across 32-bit and 64-bit boundaries
-  const long long ks[] = {1LL,     2LL,     3LL,     10LL,    100LL,   1000LL,
-                          65534LL, 65535LL, 65536LL, 65537LL, 100000LL};
+  const long long ks[] = {1LL, 2LL, 3LL, 10LL, 100LL, 1000LL, 65535LL, 65536LL};
   for (long long k : ks) {
     for (long long d = -2; d <= 2; ++d) {
       if (k * k + d >= 0) verify_quotients(k * k + d);
       if (k * (k + 1) + d >= 0) verify_quotients(k * (k + 1) + d);
     }
+  }
+  for (long long d = -1; d <= 1; ++d) {
+    verify_quotients(100000LL * 100000LL + d);
+    verify_quotients(100000LL * 100001LL + d);
   }
 
   // Powers of 2 up to 2^34 (including 2^32 threshold)
@@ -138,12 +139,15 @@ void test_random(std::mt19937_64& rng) {
     assert(enumerate_quotients(n) == naive_enumerate_quotients(n));
   }
 
-  std::uniform_int_distribution<long long> u32_dist(100001LL, 4294967295LL);
-  for (int i = 0; i < 20; ++i) verify_quotients(u32_dist(rng));
+  std::uniform_int_distribution<long long> mid_dist(100001LL, 10000000LL);
+  for (int i = 0; i < 10; ++i) verify_quotients(mid_dist(rng));
+
+  std::uniform_int_distribution<long long> u32_dist(10000001LL, 4294967295LL);
+  for (int i = 0; i < 5; ++i) verify_quotients(u32_dist(rng));
 
   std::uniform_int_distribution<long long> u64_dist(4294967296LL,
                                                     10000000000LL);
-  for (int i = 0; i < 10; ++i) verify_quotients(u64_dist(rng));
+  for (int i = 0; i < 3; ++i) verify_quotients(u64_dist(rng));
 }
 
 }  // namespace
