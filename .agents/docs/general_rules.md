@@ -23,8 +23,7 @@
 - ドキュメント: `docs/<category>/<feature>.md`
 - ユニットテスト: `tests/<category>/<feature>_test.cpp`
 - ベンチマーク: `benchmarks/<category>/<task>/`
-- スクリプト: `scripts/<name>`
-- スクリプトのユニットテスト: `scripts/tests/<name>_test.py`
+- スクリプト: `scripts/<name>.py`
 
 ## ファイル名とディレクトリ名
 
