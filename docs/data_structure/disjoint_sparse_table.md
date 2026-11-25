@@ -9,7 +9,7 @@ template <typename S, auto op, auto e>
 class DisjointSparseTable;
 ```
 
-モノイド $(S, \mathrm{op}, e)$ を指定します。
+モノイド $(S, \mathrm{op}, e)$ を指定します。簡略化のため $\mathrm{op}(x, y)$ を $xy$ と表記します。
 
 ### 制約
 
@@ -55,7 +55,7 @@ $a_p$ を返します。
 S DisjointSparseTable::prod(int l, int r) const;
 ```
 
-$\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})$ を返します。 $l = r$ のときは `e()` を返します。
+$a_l a_{l+1} \cdots a_{r-1}$ を返します。 $l = r$ のときは `e()` を返します。
 
 ### 制約
 
@@ -71,7 +71,7 @@ $\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})$ を返します。 $l = r$ のとき
 S DisjointSparseTable::all_prod() const;
 ```
 
-$\mathrm{op}(a_0, a_1, \dots, a_{n-1})$ を返します。 $n = 0$ のときは `e()` を返します。
+$a_0a_1 \cdots a_{n-1}$ を返します。 $n = 0$ のときは `e()` を返します。
 
 ### 計算量
 
@@ -88,6 +88,15 @@ int DisjointSparseTable::size() const;
 ### 計算量
 
 - $O(1)$
+
+## 補足
+
+$(S, \mathrm{op}, e)$ が厳密なモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
+
+- 任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
+- $e \in S$
+- 任意の $x \in S$ について $ex = xe = x$
+- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
 
 ## 使用例
 

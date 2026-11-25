@@ -9,7 +9,7 @@ template <typename S, auto op, auto e>
 class SegmentTree;
 ```
 
-モノイド $(S, \mathrm{op}, e)$ を指定します。
+モノイド $(S, \mathrm{op}, e)$ を指定します。簡略化のため $\mathrm{op}(x, y)$ を $xy$ と表記します。
 
 ### 制約
 
@@ -77,7 +77,7 @@ $a_p$ を返します。
 S SegmentTree::prod(int l, int r) const;
 ```
 
-$\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})$ を返します。 $l = r$ のときは `e()` を返します。
+$a_l a_{l+1} \cdots a_{r-1}$ を返します。 $l = r$ のときは `e()` を返します。
 
 ### 制約
 
@@ -93,7 +93,7 @@ $\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})$ を返します。 $l = r$ のとき
 S SegmentTree::all_prod() const;
 ```
 
-$\mathrm{op}(a_0, a_1, \dots, a_{n-1})$ を返します。 $n = 0$ のときは `e()` を返します。
+$a_0a_1 \cdots a_{n-1}$ を返します。 $n = 0$ のときは `e()` を返します。
 
 ### 計算量
 
@@ -109,8 +109,8 @@ int SegmentTree::max_right(int l, F f) const;
 以下の条件をすべて満たす整数 $r$ を返します。
 
 - $l \leq r \leq n$
-- $l < i \leq r$ に対して $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{i-1})) = \mathrm{true}$
-- $r < i \leq n$ に対して $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{i-1})) = \mathrm{false}$
+- $l < i \leq r$ に対して $f(a_l a_{l+1} \cdots a_{i-1}) = \mathrm{true}$
+- $r < i \leq n$ に対して $f(a_l a_{l+1} \cdots a_{i-1}) = \mathrm{false}$
 
 ### 制約
 
@@ -133,8 +133,8 @@ int SegmentTree::min_left(int r, F f) const;
 以下の条件をすべて満たす整数 $l$ を返します。
 
 - $0 \leq l \leq r$
-- $l \leq i < r$ に対して $f(\mathrm{op}(a_i, a_{i+1}, \dots, a_{r-1})) = \mathrm{true}$
-- $0 \leq i < l$ に対して $f(\mathrm{op}(a_i, a_{i+1}, \dots, a_{r-1})) = \mathrm{false}$
+- $l \leq i < r$ に対して $f(a_i a_{i+1} \cdots a_{r-1}) = \mathrm{true}$
+- $0 \leq i < l$ に対して $f(a_i a_{i+1} \cdots a_{r-1}) = \mathrm{false}$
 
 ### 制約
 
@@ -158,6 +158,15 @@ int SegmentTree::size() const;
 ### 計算量
 
 - $O(1)$
+
+## 補足
+
+$(S, \mathrm{op}, e)$ が厳密なモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
+
+- 任意の時点における任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
+- $e \in S$
+- 任意の $x \in S$ について $ex = xe = x$
+- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
 
 ## 使用例
 
