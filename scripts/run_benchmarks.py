@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -476,6 +477,40 @@ def run_task(
     return task_report, task_ok
 
 
+def format_float(value: float) -> str:
+    """Format a finite float without scientific notation."""
+    if not math.isfinite(value):
+        return json.dumps(value)
+    if value == 0.0:
+        return "0.0"
+    formatted = format(Decimal(str(value)), "f")
+    return formatted if "." in formatted else f"{formatted}.0"
+
+
+def dumps_json(value: Any, level: int = 0) -> str:
+    """Serialize value as 2-space indented JSON without scientific notation for floats."""
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        child_indent = "  " * (level + 1)
+        closing_indent = "  " * level
+        items = [
+            f"{child_indent}{json.dumps(k)}: {dumps_json(v, level + 1)}"
+            for k, v in value.items()
+        ]
+        return "{\n" + ",\n".join(items) + "\n" + closing_indent + "}"
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        child_indent = "  " * (level + 1)
+        closing_indent = "  " * level
+        items = [f"{child_indent}{dumps_json(v, level + 1)}" for v in value]
+        return "[\n" + ",\n".join(items) + "\n" + closing_indent + "]"
+    if isinstance(value, float):
+        return format_float(value)
+    return json.dumps(value)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run competitive-programming style benchmarks.")
     parser.add_argument(
@@ -506,7 +541,7 @@ def main() -> int:
         if args.targets:
             print("Error: No task.json found under specified target(s).", file=sys.stderr)
             return 1
-        print(json.dumps({"ok": True, "tasks": []}, indent=2))
+        print(dumps_json({"ok": True, "tasks": []}))
         return 0
 
     all_ok = True
@@ -524,7 +559,7 @@ def main() -> int:
             })
             all_ok = False
 
-    print(json.dumps({"ok": all_ok, "tasks": task_reports}, indent=2))
+    print(dumps_json({"ok": all_ok, "tasks": task_reports}))
     return 0 if all_ok else 1
 
 
