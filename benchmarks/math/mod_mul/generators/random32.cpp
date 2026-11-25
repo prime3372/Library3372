@@ -11,11 +11,11 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int q = std::atoi(argv[1]);
   int k = std::atoi(argv[2]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x517cc1b727220a95ULL);
   std::uniform_int_distribution<unsigned int> m_dist(3U, 0xffffffffU);

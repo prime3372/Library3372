@@ -8,12 +8,13 @@
 #include <cstdlib>
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
   assert(argc >= 2);
+  int n = std::atoi(argv[1]);
+
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
-  int n = std::atoi(argv[1]);
   int m = 2 * (n - 1) + 1;
 
   std::cout << n << " " << m << "\n";

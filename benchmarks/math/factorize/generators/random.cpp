@@ -11,13 +11,13 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 5);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int q = std::atoi(argv[1]);
   long long min_val = std::atoll(argv[2]);
   long long max_val = std::atoll(argv[3]);
   int odd_only = std::atoi(argv[4]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x13579bdf2468ace0ULL);
   std::uniform_int_distribution<long long> dist(min_val, max_val);

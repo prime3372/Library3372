@@ -14,12 +14,12 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int q = std::atoi(argv[1]);
   long long p_min = std::atoll(argv[2]);
   long long p_max = std::atoll(argv[3]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x369cf02468ace135ULL);
   std::uniform_int_distribution<long long> dist(p_min, p_max);

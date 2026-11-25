@@ -10,12 +10,12 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int gadgets = std::atoi(argv[1]);
   long long scale = std::atoll(argv[2]);
   assert(gadgets >= 1 && scale >= 2);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   long long cap = scale / 2;
   long long half1 = cap / 2;
