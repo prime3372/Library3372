@@ -1,0 +1,21 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["2000", "5000"]
+    },
+    {
+      "name": "build_heavy_large",
+      "generator": "random.cpp",
+      "args": ["500000", "10"]
+    },
+    {
+      "name": "query_heavy_large",
+      "generator": "random.cpp",
+      "args": ["500000", "2000000"]
+    }
+  ]
+}
