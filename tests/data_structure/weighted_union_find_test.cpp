@@ -44,6 +44,27 @@ struct Vec2 {
   friend bool operator==(const Vec2&, const Vec2&) = default;
 };
 
+struct MissingSub {
+  MissingSub& operator+=(const MissingSub&) { return *this; }
+};
+
+struct NoDefaultGroup {
+  explicit NoDefaultGroup(int) {}
+  NoDefaultGroup& operator+=(const NoDefaultGroup&) { return *this; }
+  NoDefaultGroup& operator-=(const NoDefaultGroup&) { return *this; }
+};
+
+template <typename T>
+concept CanInstantiateWuf = requires { typename WeightedUnionFind<T>; };
+
+static_assert(CanInstantiateWuf<int>);
+static_assert(CanInstantiateWuf<Vec2>);
+static_assert(!CanInstantiateWuf<bool>);
+static_assert(!CanInstantiateWuf<const int>);
+static_assert(!CanInstantiateWuf<int&>);
+static_assert(!CanInstantiateWuf<MissingSub>);
+static_assert(!CanInstantiateWuf<NoDefaultGroup>);
+
 template <typename T> class NaiveWeightedUnionFind {
  public:
   using UniteResult = typename WeightedUnionFind<T>::UniteResult;

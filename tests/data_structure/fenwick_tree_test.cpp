@@ -54,6 +54,27 @@ static_assert(!HasBinarySearch<double>);
 static_assert(!HasBinarySearch<StaticModInt<998244353>>);
 static_assert(!HasBinarySearch<Vec2>);
 
+struct MissingSub {
+  MissingSub& operator+=(const MissingSub&) { return *this; }
+};
+
+struct NoDefaultGroup {
+  explicit NoDefaultGroup(int) {}
+  NoDefaultGroup& operator+=(const NoDefaultGroup&) { return *this; }
+  NoDefaultGroup& operator-=(const NoDefaultGroup&) { return *this; }
+};
+
+template <typename T>
+concept CanInstantiateFw = requires { typename FenwickTree<T>; };
+
+static_assert(CanInstantiateFw<int>);
+static_assert(CanInstantiateFw<Vec2>);
+static_assert(!CanInstantiateFw<bool>);
+static_assert(!CanInstantiateFw<const int>);
+static_assert(!CanInstantiateFw<int&>);
+static_assert(!CanInstantiateFw<MissingSub>);
+static_assert(!CanInstantiateFw<NoDefaultGroup>);
+
 template <typename T> class NaiveFenwickTree {
  public:
   explicit NaiveFenwickTree(int n) : a_(n, T{}) {}
