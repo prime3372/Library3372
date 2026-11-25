@@ -4,17 +4,16 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#include <cassert>
 #include <cstdlib>
 #include <iostream>
 
 int main(int argc, char** argv) {
-  assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
+  if (argc < 3) return 1;
   int n = std::atoi(argv[1]);
   int period = std::atoi(argv[2]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::cout << n << "\n";
   for (int i = 0; i < n; ++i) {

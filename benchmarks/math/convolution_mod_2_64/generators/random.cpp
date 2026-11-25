@@ -9,11 +9,12 @@
 #include <random>
 
 int main(int argc, char* argv[]) {
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
   if (argc < 3) return 1;
   int n = std::atoi(argv[1]);
   int m = std::atoi(argv[2]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x91e10da5c79e7b1dULL);
 

@@ -9,11 +9,12 @@
 #include <random>
 
 int main(int argc, char* argv[]) {
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
   if (argc < 3) return 1;
   int n = std::atoi(argv[1]);
   int m = std::atoi(argv[2]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x3a7f8c2e19b04d51ULL);
   std::uniform_int_distribution<int> dist(0, 1000000);

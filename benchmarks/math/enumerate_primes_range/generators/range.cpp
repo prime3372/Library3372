@@ -4,17 +4,17 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#include <cassert>
 #include <cstdlib>
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-  assert(argc >= 3);
+  if (argc < 3) return 1;
+  long long l = std::atoll(argv[1]);
+  long long r = std::atoll(argv[2]);
+
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
-  long long l = std::atoll(argv[1]);
-  long long r = std::atoll(argv[2]);
   std::cout << l << ' ' << r << '\n';
   return 0;
 }

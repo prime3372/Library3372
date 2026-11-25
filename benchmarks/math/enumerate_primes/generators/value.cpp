@@ -4,16 +4,16 @@
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#include <cassert>
 #include <cstdlib>
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-  assert(argc >= 2);
+  if (argc < 2) return 1;
+  int n = std::atoi(argv[1]);
+
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
 
-  int n = std::atoi(argv[1]);
   std::cout << n << '\n';
   return 0;
 }

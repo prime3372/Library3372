@@ -13,6 +13,9 @@ int main(int argc, char* argv[]) {
   int n = std::atoi(argv[1]);
   int m = std::atoi(argv[2]);
 
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+
   std::mt19937_64 rng(0x517cc1b727220a95ULL);
   std::uniform_int_distribution<int> dist(0, 998244352);
 
