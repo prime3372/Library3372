@@ -122,7 +122,7 @@ void convolution_garner(SrcA&& get_a, int n, SrcB&& get_b, int k,
   }
 }
 
-namespace internal_crt {
+namespace internal_convolution_garner {
 
 template <typename T>
 unsigned int normalize_elem32(T v, const Barrett32& barrett) {
@@ -217,7 +217,7 @@ std::vector<T> convolution_naive64(const unsigned long long* pa, int n,
   return ans;
 }
 
-}  // namespace internal_crt
+}  // namespace internal_convolution_garner
 
 template <int MaxLog, int P0, int P1, int P2, typename OutT, typename InT>
 std::vector<OutT> convolution_arbitrary_mod32(const std::vector<InT>& a,
@@ -247,11 +247,13 @@ std::vector<OutT> convolution_arbitrary_mod32(const std::vector<InT>& a,
   NttAlignedBuffer norm_b((is_integer_v<InT> && !same_input) ? k : 0);
   if constexpr (is_integer_v<InT>) {
     for (int i = 0; i < n; ++i) {
-      norm_a.data[i] = internal_crt::normalize_elem32(a[i], barrett);
+      norm_a.data[i] =
+          internal_convolution_garner::normalize_elem32(a[i], barrett);
     }
     if (!same_input) {
       for (int i = 0; i < k; ++i) {
-        norm_b.data[i] = internal_crt::normalize_elem32(b[i], barrett);
+        norm_b.data[i] =
+            internal_convolution_garner::normalize_elem32(b[i], barrett);
       }
     }
   }
@@ -272,7 +274,7 @@ std::vector<OutT> convolution_arbitrary_mod32(const std::vector<InT>& a,
   };
 
   if (std::min(n, k) <= ntt_naive_threshold) {
-    return internal_crt::convolution_naive32<OutT>(
+    return internal_convolution_garner::convolution_naive32<OutT>(
         get_src_a(), n, get_src_b(), k, (unsigned int)mod, to_out);
   }
 
@@ -315,18 +317,18 @@ std::vector<T> convolution_arbitrary_mod64(const std::vector<T>& a,
   bool same_input = (&a == &b);
   NttAlignedBuffer64 norm_a(n);
   for (int i = 0; i < n; ++i) {
-    norm_a.data[i] = internal_crt::normalize_elem64(a[i], mod);
+    norm_a.data[i] = internal_convolution_garner::normalize_elem64(a[i], mod);
   }
   NttAlignedBuffer64 norm_b(same_input ? 0 : k);
   if (!same_input) {
     for (int i = 0; i < k; ++i) {
-      norm_b.data[i] = internal_crt::normalize_elem64(b[i], mod);
+      norm_b.data[i] = internal_convolution_garner::normalize_elem64(b[i], mod);
     }
   }
 
   unsigned long long um = (unsigned long long)mod;
   if (std::min(n, k) <= ntt_naive_threshold) {
-    return internal_crt::convolution_naive64<T>(
+    return internal_convolution_garner::convolution_naive64<T>(
         norm_a.data, n, same_input ? norm_a.data : norm_b.data, k, um);
   }
 
