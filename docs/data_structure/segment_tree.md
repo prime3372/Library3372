@@ -109,15 +109,15 @@ int SegmentTree::max_right(int l, F f) const;
 以下の条件をすべて満たす整数 $r$ を返します。
 
 - $l \leq r \leq n$
-- $r = l$ または $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})) = \mathrm{true}$
-- $r = n$ または $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_r)) = \mathrm{false}$
+- $l < i \leq r$ に対して $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{i-1})) = \mathrm{true}$
+- $r < i \leq n$ に対して $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{i-1})) = \mathrm{false}$
 
 ### 制約
 
 - `f` は `f(const S&)` の形で呼び出し可能であり、`bool` を返す述語である
 - $0 \leq l \leq n$
 - $f(e) = \mathrm{true}$
-- 任意の $l < r_1 \leq r_2 \leq n$ について $f(\mathrm{op}(a_l, \dots, a_{r_2-1})) = \mathrm{true}$ ならば $f(\mathrm{op}(a_l, \dots, a_{r_1-1})) = \mathrm{true}$ である
+- 条件を満たす $r$ が存在する
 
 ### 計算量
 
@@ -133,15 +133,15 @@ int SegmentTree::min_left(int r, F f) const;
 以下の条件をすべて満たす整数 $l$ を返します。
 
 - $0 \leq l \leq r$
-- $l = r$ または $f(\mathrm{op}(a_l, a_{l+1}, \dots, a_{r-1})) = \mathrm{true}$
-- $l = 0$ または $f(\mathrm{op}(a_{l-1}, a_l, \dots, a_{r-1})) = \mathrm{false}$
+- $l \leq i < r$ に対して $f(\mathrm{op}(a_i, a_{i+1}, \dots, a_{r-1})) = \mathrm{true}$
+- $0 \leq i < l$ に対して $f(\mathrm{op}(a_i, a_{i+1}, \dots, a_{r-1})) = \mathrm{false}$
 
 ### 制約
 
 - `f` は `f(const S&)` の形で呼び出し可能であり、`bool` を返す述語である
 - $0 \leq r \leq n$
 - $f(e) = \mathrm{true}$
-- 任意の $0 \leq l_1 \leq l_2 < r$ について $f(\mathrm{op}(a_{l_1}, \dots, a_{r-1})) = \mathrm{true}$ ならば $f(\mathrm{op}(a_{l_2}, \dots, a_{r-1})) = \mathrm{true}$ である
+- 条件を満たす $l$ が存在する
 
 ### 計算量
 
@@ -164,14 +164,13 @@ int SegmentTree::size() const;
 ```cpp
 #include <algorithm>
 #include <iostream>
-#include <limits>
 #include <vector>
 
 #include "library3372/data_structure/segment_tree.hpp"
 
 int main() {
   constexpr auto op = [](long long a, long long b) { return std::max(a, b); };
-  constexpr auto e = []() { return std::numeric_limits<long long>::min(); };
+  constexpr auto e = []() { return -1LL; };
 
   std::vector<long long> a = {3, 1, 4, 1, 5};
   library3372::SegmentTree<long long, op, e> seg(a);
@@ -180,6 +179,7 @@ int main() {
   seg.set(3, 6);
   std::cout << seg.prod(1, 4) << "\n";  // 6
   std::cout << seg.all_prod() << "\n";  // 6
+  std::cout << seg.prod(2, 2) << "\n";  // -1
 
   int r = seg.max_right(0, [](long long x) { return x < 5; });
   std::cout << r << "\n";  // 3
