@@ -4,7 +4,7 @@
 
 長さ $N$ の非負整数列 $A = (A_1, A_2, \dots, A_N)$ が与えられます。この列の接尾辞配列 $\mathrm{sa} = (\mathrm{sa}_1, \mathrm{sa}_2, \dots, \mathrm{sa}_N)$ を求めてください。
 
-すなわち、$1, 2, \dots, N$ の順列であって、すべての $1 \leq i < N$ について $(A_{\mathrm{sa}_i}, A_{\mathrm{sa}_i + 1}, \dots, A_N) < (A_{\mathrm{sa}_{i + 1}}, A_{\mathrm{sa}_{i + 1} + 1}, \dots, A_N)$ を辞書順で満たすものを求めてください。
+すなわち、 $1, 2, \dots, N$ の順列であって、すべての $1 \leq i < N$ について $(A_{\mathrm{sa}_i}, A_{\mathrm{sa}_i + 1}, \dots, A_N) < (A_{\mathrm{sa}_{i + 1}}, A_{\mathrm{sa}_{i + 1} + 1}, \dots, A_N)$ を辞書順で満たすものを求めてください。
 
 ## 制約
 

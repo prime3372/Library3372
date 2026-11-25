@@ -26,4 +26,4 @@ B_0 B_1 ... B_{M-1}
 
 ## 出力
 
-初期値 $h = 0$ から始め、$k = 0, 1, \dots, N + M - 2$ の順に `library3372/internal/hash/hash_combine.hpp` の `hash_combine(h, C_k)` を適用して得られる 64 bit 符号なし整数を出力してください。
+初期値 $h = 0$ から始め、 $k = 0, 1, \dots, N + M - 2$ の順に `library3372/internal/hash/hash_combine.hpp` の `hash_combine(h, C_k)` を適用して得られる 64 bit 符号なし整数を出力してください。

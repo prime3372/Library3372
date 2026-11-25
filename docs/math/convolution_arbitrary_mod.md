@@ -25,21 +25,21 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
                                          const std::vector<T>& b);  // (4)
 ```
 
-数列 $a, b$ に対し、長さ $|a| + |b| - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。$a$ または $b$ が空の場合は空の `std::vector` を返します。
+数列 $a, b$ に対し、長さ $\lvert a \rvert + \lvert b \rvert - 1$ の数列 $c$ を $c_k = \left(\sum_{i + j = k} a_i b_j\right) \bmod m$ として計算します。 $a$ または $b$ が空の場合は空の `std::vector` を返します。
 
 ### 制約
 
 - (1), (3), (4): $m \geq 1$
-- $|a| + |b| - 1 \leq 2^{25}$
+- $\lvert a \rvert + \lvert b \rvert - 1 \leq 2^{25}$
 - (3), (4): `T` は整数型
 
 ### 計算量
 
-- $n = |a| + |b|$ として $O(n \log n)$
+- $n = \lvert a \rvert + \lvert b \rvert$ として $O(n \log n)$
 
 ## 補足
 
-$|a| + |b| - 1 > 2^{24}$ のときは、$|a| + |b| - 1 \leq 2^{24}$ のときと比べて定数倍が約 1.1 ～ 1.2 倍悪化します。
+$\lvert a \rvert + \lvert b \rvert - 1 > 2^{24}$ のときは、 $\lvert a \rvert + \lvert b \rvert - 1 \leq 2^{24}$ のときと比べて定数倍が約 1.1 ～ 1.2 倍悪化します。
 
 ## 使用例
 

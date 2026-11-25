@@ -9,7 +9,7 @@ std::vector<std::tuple<long long, long long, long long>> enumerate_quotients(
     long long n);
 ```
 
-$1 \leq x \leq n$ における $\lfloor n / x \rfloor$ のとり得るすべての値 $q$ と、$\lfloor n / x \rfloor = q$ となる半開区間 $[l, r)$ の組 $(q, l, r)$ を $q$ の昇順で格納した配列を返します。$n = 0$ のときは空配列を返します。
+$1 \leq x \leq n$ における $\lfloor n / x \rfloor$ のとり得るすべての値 $q$ と、 $\lfloor n / x \rfloor = q$ となる半開区間 $[l, r)$ の組 $(q, l, r)$ を $q$ の昇順で格納した配列を返します。 $n = 0$ のときは空配列を返します。
 
 ### 制約
 
