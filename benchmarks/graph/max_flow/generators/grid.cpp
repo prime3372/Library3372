@@ -11,13 +11,13 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int h = std::atoi(argv[1]);
   int w = std::atoi(argv[2]);
   long long max_cap = std::atoll(argv[3]);
   assert(h >= 2 && w >= 2 && max_cap >= 1);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   int n = h * w;
   int m = h * (w - 1) + (h - 1) * w;

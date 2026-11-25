@@ -10,12 +10,12 @@
 #include <string>
 #include <utility>
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
   assert(argc >= 2);
+  int n = std::atoi(argv[1]);
+
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
-
-  int n = std::atoi(argv[1]);
 
   std::string a = "0";
   std::string b = "1";

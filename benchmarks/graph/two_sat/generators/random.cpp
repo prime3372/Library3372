@@ -9,13 +9,13 @@
 #include <iostream>
 #include <random>
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
   assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int n = std::atoi(argv[1]);
   int m = std::atoi(argv[2]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x6a09e667f3bcc909ULL ^ ((unsigned long long)n << 32) ^
                       (unsigned long long)m);

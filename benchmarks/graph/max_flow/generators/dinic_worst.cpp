@@ -10,13 +10,13 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int k = std::atoi(argv[1]);
   int chain_len = std::atoi(argv[2]);
   int p = std::atoi(argv[3]);
   assert(k >= 2 && chain_len >= 2 && p >= 1);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   constexpr long long inf = 1000000000LL;
   int n = 2 * k + chain_len + 2;

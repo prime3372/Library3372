@@ -11,12 +11,12 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 4);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int q = std::atoi(argv[1]);
   long long min_k = std::atoll(argv[2]);
   long long max_k = std::atoll(argv[3]);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x13198a2e03707344ULL);
   std::uniform_int_distribution<long long> k_dist(min_k, max_k);

@@ -11,12 +11,12 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int n = std::atoi(argv[1]);
   int q = std::atoi(argv[2]);
   assert(n >= 1 && q >= 1);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   std::mt19937_64 rng(0x243f6a8885a308d3ULL);
   std::uniform_int_distribution<int> vdist(0, n - 1);

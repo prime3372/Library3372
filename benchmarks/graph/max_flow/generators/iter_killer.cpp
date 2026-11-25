@@ -10,12 +10,12 @@
 
 int main(int argc, char* argv[]) {
   assert(argc >= 3);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int d = std::atoi(argv[1]);
   int k = std::atoi(argv[2]);
   assert(d >= 1 && k >= d);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   int s = 0;
   int a_base = 1;

@@ -21,15 +21,15 @@ struct RawEdge {
 
 int main(int argc, char* argv[]) {
   assert(argc >= 6);
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(nullptr);
-
   int b = std::atoi(argv[1]);
   int l = std::atoi(argv[2]);
   int k1 = std::atoi(argv[3]);
   int chain1 = std::atoi(argv[4]);
   int p1 = std::atoi(argv[5]);
   assert(b >= 2 && l >= 1 && k1 >= 2 && chain1 >= 2 && p1 >= 1);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
 
   constexpr long long inf = 1000000000LL;
   int l0 = 2 * k1 + chain1 + 20;
