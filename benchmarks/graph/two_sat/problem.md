@@ -15,10 +15,10 @@ $N$ 個の真偽値変数 $x_0, x_1, \dots, x_{N-1}$ と $M$ 個の節 $(x_{i_k}
 
 ```plaintext
 N M
+i_0 f_0 j_0 g_0
 i_1 f_1 j_1 g_1
-i_2 f_2 j_2 g_2
 ...
-i_M f_M j_M g_M
+i_{M-1} f_{M-1} j_{M-1} g_{M-1}
 ```
 
 ## 出力

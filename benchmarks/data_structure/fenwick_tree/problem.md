@@ -25,10 +25,10 @@
 ```plaintext
 N Q
 A_0 A_1 ... A_{N-1}
+query_0
 query_1
-query_2
 ...
-query_Q
+query_{Q-1}
 ```
 
 ## 出力

@@ -24,10 +24,10 @@ $N$ 頂点 $0$ 辺の無向グラフが与えられます。各頂点 $i$ ($0 \l
 
 ```plaintext
 N Q
+query_0
 query_1
-query_2
 ...
-query_Q
+query_{Q-1}
 ```
 
 ## 出力
