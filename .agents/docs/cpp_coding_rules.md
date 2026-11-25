@@ -21,10 +21,12 @@
 
 ### [名前空間](https://google.github.io/styleguide/cppguide.html#namespaces)
 
-- `library3372/` 以下の公開コンポーネントは `library3372` 名前空間に実装します。
-- `library3372/internal/` 内のコンポーネントは `library3372::internal` 名前空間に実装します。
-- 1 つのヘッダファイル内でのみ利用する内部用コンポーネントは `library3372::internal_<id>` 名前空間に実装します。ここで `<id>` はファイル名に基づく識別子です。
-- 必要に応じてその他の名前空間を作成してもかまいません。
+- 以下のように名前空間を使い分けます。ここで `<id>` はファイル名に基づく識別子です。
+  - `library3372`: 公開ライブラリ
+  - `library3372::internal`: 非公開ライブラリ
+  - `library3372::internal_<id>`: 公開ライブラリの内部用コンポーネント
+  - `library3372::internal::internal_<id>`: 非公開ライブラリの内部用コンポーネント
+- 必要に応じて他の名前空間を作成してもかまいません。
 
 ## [クラス](https://google.github.io/styleguide/cppguide.html#classes)
 
