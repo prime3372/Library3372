@@ -42,5 +42,5 @@ query_Q
    - `3 u`: 連結成分の頂点数を結合する。
    - `4 u`: 代表元を結合する。
    - `5`: 連結成分の個数を結合する。
-3. 全クエリ処理後、各連結成分について頂点番号を昇順に並べた配列 `g` を考え、`gh = (unsigned long long)g.size()` から始めて各頂点 `v` を順に `gh = hash_combine(gh, (unsigned long long)v)` で結合する。すべての連結成分についての `gh` の総和（$\bmod\ 2^{64}$）を `groups_hash` とする。
+3. 全クエリ処理後、各連結成分について頂点番号を昇順に並べた配列 `g` を考え、`gh = (unsigned long long)g.size()` から始めて各頂点 `v` を順に `gh = hash_combine(gh, (unsigned long long)v)` で結合する。すべての連結成分についての `gh` の総和 ($\bmod\ 2^{64}$) を `groups_hash` とする。
 4. `ans_hash = hash_combine(ans_hash, groups_hash)` とする。
