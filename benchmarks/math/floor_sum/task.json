@@ -1,0 +1,26 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_small",
+      "generator": "random.cpp",
+      "args": ["10000", "1000", "1000", "-1000", "1000"]
+    },
+    {
+      "name": "random_32bit",
+      "generator": "random.cpp",
+      "args": ["1000000", "2147483647", "2147483647", "-2147483648", "2147483647"]
+    },
+    {
+      "name": "random_64bit",
+      "generator": "random.cpp",
+      "args": ["500000", "9223372036854775807", "9223372036854775807", "-9223372036854775808", "9223372036854775807"]
+    },
+    {
+      "name": "fibonacci_64bit",
+      "generator": "fibonacci.cpp",
+      "args": ["500000"]
+    }
+  ]
+}
