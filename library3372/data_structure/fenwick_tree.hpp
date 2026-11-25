@@ -14,27 +14,9 @@
 #include <vector>
 
 #include "library3372/internal/type_traits/is_integer.hpp"
+#include "library3372/internal/type_traits/to_unsigned.hpp"
 
 namespace library3372 {
-
-namespace internal_fenwick_tree {
-
-template <typename T> struct StorageType {
-  using type = T;
-};
-
-template <typename T>
-  requires(internal::is_signed_integer_v<T> &&
-           !std::is_same_v<std::remove_cv_t<T>, __int128>)
-struct StorageType<T> {
-  using type = std::make_unsigned_t<T>;
-};
-
-template <> struct StorageType<__int128> {
-  using type = unsigned __int128;
-};
-
-}  // namespace internal_fenwick_tree
 
 // Fenwick tree (Binary Indexed Tree)
 // https://en.wikipedia.org/wiki/Fenwick_tree
@@ -121,7 +103,7 @@ class FenwickTree {
   int size() const { return n_; }
 
  private:
-  using Storage = typename internal_fenwick_tree::StorageType<T>::type;
+  using Storage = internal::to_unsigned_t<T>;
 
   static void add_assign(Storage& a, const Storage& b) {
     if constexpr (sizeof(Storage) < sizeof(int) &&

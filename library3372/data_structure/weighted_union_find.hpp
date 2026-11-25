@@ -14,27 +14,9 @@
 #include <vector>
 
 #include "library3372/internal/type_traits/is_integer.hpp"
+#include "library3372/internal/type_traits/to_unsigned.hpp"
 
 namespace library3372 {
-
-namespace internal_weighted_union_find {
-
-template <typename T> struct StorageType {
-  using type = T;
-};
-
-template <typename T>
-  requires(internal::is_signed_integer_v<T> &&
-           !std::is_same_v<std::remove_cv_t<T>, __int128>)
-struct StorageType<T> {
-  using type = std::make_unsigned_t<T>;
-};
-
-template <> struct StorageType<__int128> {
-  using type = unsigned __int128;
-};
-
-}  // namespace internal_weighted_union_find
 
 // Weighted disjoint-set data structure with path compression and union by size
 // https://en.wikipedia.org/wiki/Disjoint-set_data_structure
@@ -123,7 +105,7 @@ class WeightedUnionFind {
   }
 
  private:
-  using Storage = typename internal_weighted_union_find::StorageType<T>::type;
+  using Storage = internal::to_unsigned_t<T>;
 
   static void add_assign(Storage& a, const Storage& b) {
     if constexpr (sizeof(Storage) < sizeof(int) &&
