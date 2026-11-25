@@ -22,10 +22,10 @@ $N$ 頂点 $0$ 辺の無向グラフが与えられます。以下の $Q$ 個の
 
 ```plaintext
 N Q
+query_0
 query_1
-query_2
 ...
-query_Q
+query_{Q-1}
 ```
 
 ## 出力
