@@ -1,0 +1,26 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "random_32bit",
+      "generator": "random.cpp",
+      "args": ["1000000", "0", "2147483647", "2", "32"]
+    },
+    {
+      "name": "random_64bit",
+      "generator": "random.cpp",
+      "args": ["1000000", "0", "9223372036854775807", "2", "64"]
+    },
+    {
+      "name": "small_k_64bit",
+      "generator": "random.cpp",
+      "args": ["1000000", "0", "9223372036854775807", "3", "10"]
+    },
+    {
+      "name": "near_powers_64bit",
+      "generator": "powers.cpp",
+      "args": ["1000000", "3", "20"]
+    }
+  ]
+}
