@@ -1,11 +1,11 @@
 // Repository: Library3372
-// File: library3372/internal/data_structure/monoid.hpp
-// URL: https://github.com/prime3372/Library3372/blob/main/library3372/internal/data_structure/monoid.hpp
+// File: library3372/internal/algebra/monoid.hpp
+// URL: https://github.com/prime3372/Library3372/blob/main/library3372/internal/algebra/monoid.hpp
 // Author: prime3372
 // License: CC0 1.0 Universal
 
-#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_DATA_STRUCTURE_MONOID_HPP_
-#define LIBRARY3372_LIBRARY3372_INTERNAL_DATA_STRUCTURE_MONOID_HPP_
+#ifndef LIBRARY3372_LIBRARY3372_INTERNAL_ALGEBRA_MONOID_HPP_
+#define LIBRARY3372_LIBRARY3372_INTERNAL_ALGEBRA_MONOID_HPP_
 
 #include <concepts>
 #include <type_traits>
@@ -74,4 +74,4 @@ struct MonoidAdapter {
 
 }  // namespace library3372::internal
 
-#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_DATA_STRUCTURE_MONOID_HPP_
+#endif  // LIBRARY3372_LIBRARY3372_INTERNAL_ALGEBRA_MONOID_HPP_

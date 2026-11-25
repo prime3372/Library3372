@@ -13,7 +13,7 @@
 #include <limits>
 #include <vector>
 
-#include "library3372/internal/data_structure/monoid.hpp"
+#include "library3372/internal/algebra/monoid.hpp"
 
 namespace library3372 {
 
