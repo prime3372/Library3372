@@ -51,7 +51,7 @@
 
 ## スクリプトのテスト
 
-- Python 製スクリプトやツール（`bundle.py` 等）のユニットテストは `scripts/tests/<name>_test.py` に `unittest` で作成します。
+- Python スクリプトのユニットテストは `unittest` で作成します。
 - `scripts/run_all_tests.py` は C++ ユニットテスト専用のため、Python テストは以下で実行してください。
   ```sh
   python3 -m unittest discover -s scripts/tests -p '*_test.py'
