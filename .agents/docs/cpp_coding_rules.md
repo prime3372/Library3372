@@ -9,8 +9,8 @@
 - インクルードパスはリポジトリルートからの相対パスを使用してください。
 - このライブラリ内のファイルは `#include <filename>` ではなく `#include "filename"` の形式でインクルードしてください。
 - ヘッダガードは `#pragma once` ではなく `#ifndef` / `#define` / `#endif` によるガードを使用してください。 
-  - ガードシンボルはスタイルガイドに従い `LIBRARY3372_<PATH>_<FILE>_HPP_` の形式にしてください。
-  - 例えば `library3372/internal/chrono/timer.hpp` の場合は `LIBRARY3372_LIBRARY3372_INTERNAL_CHRONO_TIMER_HPP_` とします。
+  - ガードシンボルはスタイルガイドに従い `LIBRARY3372_<PATH>_<FILE>_HPP_` の形式にしてください。例えば `library3372/internal/chrono/timer.hpp` の場合は `LIBRARY3372_LIBRARY3372_INTERNAL_CHRONO_TIMER_HPP_` とします。
+- ヘッダファイルで提供する機能は焦点を絞ってください。不要なコードをインクルードせずに済むように、ファイルを工夫して分割してください。
 
 ### [ヘッダファイル内での関数定義](https://google.github.io/styleguide/cppguide.html#Inline_Functions)
 
