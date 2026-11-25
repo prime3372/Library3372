@@ -11,8 +11,8 @@
 #include <cstring>
 
 #include "library3372/internal/math/montgomery.hpp"
-#include "library3372/math/factorize.hpp"
 #include "library3372/math/is_prime.hpp"
+#include "library3372/math/primitive_root.hpp"
 
 namespace library3372::internal {
 namespace internal_ntt64 {
@@ -20,24 +20,6 @@ namespace internal_ntt64 {
 using u32 = unsigned int;
 using i64 = long long;
 using u64 = unsigned long long;
-
-constexpr u64 ntt_primitive_root64(i64 m) {
-  if (m == 2) return 1;
-  auto factors = factorize(m - 1);
-  Montgomery64 mont((u64)m);
-  u64 one = mont.one();
-  for (u64 g = 2;; ++g) {
-    u64 gm = mont.to_mont(g);
-    bool ok = true;
-    for (const auto& [p, e] : factors) {
-      if (mont.pow(gm, ((u64)m - 1ULL) / (u64)p) == one) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return g;
-  }
-}
 
 }  // namespace internal_ntt64
 
@@ -57,7 +39,7 @@ template <long long m> struct NttInfo64 {
 
   constexpr NttInfo64() {
     if constexpr (!valid || mod == 2) return;
-    u64 g = internal_ntt64::ntt_primitive_root64((i64)mod);
+    u64 g = (u64)primitive_root((i64)mod);
     u64 g_mont = mont.to_mont(g);
 
     u64 root[64] = {};
