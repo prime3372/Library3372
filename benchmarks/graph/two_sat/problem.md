@@ -9,7 +9,7 @@ $N$ 個の真偽値変数 $x_0, x_1, \dots, x_{N-1}$ と $M$ 個の節 $(x_{i_k}
 - $1 \leq N \leq 10^6$
 - $0 \leq M \leq 2 \times 10^6$
 - $0 \leq i_k, j_k < N$
-- $f_k, g_k \in \{0, 1\}$
+- $f_k, g_k \in \lbrace 0, 1 \rbrace$
 
 ## 入力
 
