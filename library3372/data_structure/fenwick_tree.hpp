@@ -50,9 +50,23 @@ class FenwickTree {
     add_storage(p, Adapter::sub_val((Storage)x, get_storage(p)));
   }
 
+  T get(int p) const {
+    assert(0 <= p && p < n_);
+    return (T)get_storage(p);
+  }
+
   T sum(int l, int r) const {
     assert(0 <= l && l <= r && r <= n_);
-    return (T)Adapter::sub_val(prefix_sum(r), prefix_sum(l));
+    Storage s{};
+    while (r > l) {
+      Adapter::add_assign(s, data_[r]);
+      r -= r & -r;
+    }
+    while (l > r) {
+      Adapter::sub_assign(s, data_[l]);
+      l -= l & -l;
+    }
+    return (T)s;
   }
 
   int max_right(int l, const T& x) const

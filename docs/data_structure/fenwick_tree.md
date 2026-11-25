@@ -73,6 +73,22 @@ $a_p$ の値を $x$ に変更します。
 
 - $O(\log n)$
 
+## get
+
+```cpp
+T FenwickTree::get(int p) const;
+```
+
+$a_p$ を返します。
+
+### 制約
+
+- $0 \leq p < n$
+
+### 計算量
+
+- $O(\log n)$
+
 ## sum
 
 ```cpp
@@ -100,8 +116,8 @@ int FenwickTree::max_right(int l, const T& x) const;
 以下の条件をすべて満たす整数 $r$ を返します。
 
 - $l \leq r \leq n$
-- $\mathrm{sum}(l, r) \leq x$ となる
-- $r < n$ ならば $\mathrm{sum}(l, r + 1) \leq x$ が成り立たない
+- $l < i \leq r$ に対して $\mathrm{sum}(l, i) \leq x$
+- $r < i \leq n$ に対して $\mathrm{sum}(l, i) > x$
 
 ### 制約
 
@@ -124,8 +140,8 @@ int FenwickTree::min_left(int r, const T& x) const;
 以下の条件をすべて満たす整数 $l$ を返します。
 
 - $0 \leq l \leq r$
-- $\mathrm{sum}(l, r) \leq x$ となる
-- $l > 0$ ならば $\mathrm{sum}(l - 1, r) \leq x$ が成り立たない
+- $l \leq i < r$ に対して $\mathrm{sum}(i, r) \leq x$
+- $0 \leq i < l$ に対して $\mathrm{sum}(i, r) > x$
 
 ### 制約
 
@@ -164,10 +180,11 @@ int main() {
   library3372::FenwickTree<long long> fw(a);
 
   std::cout << fw.sum(1, 4) << "\n";  // 6
+  std::cout << fw.sum(2, 2) << "\n";  // 0
 
   fw.add(2, 2);
   fw.set(0, 1);
-  std::cout << fw.sum(2, 3) << "\n";  // 6
+  std::cout << fw.get(2) << "\n";     // 6
   std::cout << fw.sum(0, 5) << "\n";  // 14
 
   int r = fw.max_right(0, 8);

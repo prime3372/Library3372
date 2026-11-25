@@ -130,6 +130,7 @@ void assert_all_match(const FenwickTree<T>& fw,
                       const NaiveFenwickTree<T>& naive) {
   int n = naive.size();
   assert(fw.size() == n);
+  for (int i = 0; i < n; ++i) assert(fw.get(i) == naive.sum(i, i + 1));
   for (int l = 0; l <= n; ++l) {
     for (int r = l; r <= n; ++r) {
       assert(fw.sum(l, r) == naive.sum(l, r));
@@ -204,6 +205,8 @@ void test_signed_wrap_safety_32_64() {
   fw.set(3, 1000000000);
   assert(fw.sum(0, 4) == -1000000000);
   assert(fw.sum(1, 4) == 500000000);
+  assert(fw.get(0) == -1500000000);
+  assert(fw.get(3) == 1000000000);
 
   std::vector<long long> a = {LLONG_MAX, LLONG_MAX, LLONG_MIN, 1,        2,
                               3,         4,         5,         LLONG_MAX};

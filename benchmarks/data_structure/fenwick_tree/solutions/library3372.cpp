@@ -48,7 +48,7 @@ int main() {
     } else if (qry.type == 1) {
       fw.set(qry.a, qry.b);
     } else if (qry.type == 2) {
-      long long res = fw.sum(qry.a, qry.a + 1);
+      long long res = fw.get(qry.a);
       ans_hash = library3372::internal::hash_combine(ans_hash,
                                                      (unsigned long long)res);
     } else if (qry.type == 3) {
