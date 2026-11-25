@@ -1,0 +1,21 @@
+{
+  "runs": 5,
+  "timeout_sec": 10.0,
+  "cases": [
+    {
+      "name": "small_primes",
+      "generator": "primes.cpp",
+      "args": ["10000", "2", "1000000"]
+    },
+    {
+      "name": "primes_32",
+      "generator": "primes.cpp",
+      "args": ["10000", "1000000000", "2147483647"]
+    },
+    {
+      "name": "primes_64",
+      "generator": "primes.cpp",
+      "args": ["5000", "4611686018427387904", "9223372036854775807"]
+    }
+  ]
+}
