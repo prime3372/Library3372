@@ -385,6 +385,48 @@ void test_special_and_boundary_cases() {
     verify_flow_and_cut(n, s, t, added, mf, f1 + f2, true);
   }
 
+  // Non-unit network with small capacity sum (dinic_bound * 4 <= hlpp_bound),
+  // exercising Dinic completion without HLPP fallback.
+  {
+    constexpr int k = 15;
+    constexpr int chain_len = 20;
+    constexpr int p = 2;
+    constexpr int chain_cap = k * p;
+    constexpr int extra_n = 200;
+    int n = 2 * k + chain_len + 2 + extra_n;
+    int s = 0;
+    int t = n - 1;
+    int x_base = 1;
+    int c_base = 1 + k;
+    int y_base = 1 + k + chain_len;
+
+    MaxFlow<int> mf(n);
+    std::vector<std::pair<std::pair<int, int>, int>> added;
+    auto push_e = [&](int u, int v, int c) {
+      mf.add_edge(u, v, c);
+      added.push_back({{u, v}, c});
+    };
+
+    for (int r = 0; r < k; ++r) push_e(s, x_base + r, p);
+    for (int r = 1; r < k; ++r) push_e(x_base + r, x_base + r - 1, chain_cap);
+    push_e(x_base, c_base, chain_cap);
+    for (int i = 0; i + 1 < chain_len; ++i)
+      push_e(c_base + i, c_base + i + 1, chain_cap);
+    push_e(c_base + chain_len - 1, y_base, chain_cap);
+    for (int r = 0; r + 1 < k; ++r)
+      push_e(y_base + r, y_base + r + 1, chain_cap);
+    for (int r = 0; r < k; ++r) {
+      for (int j = 0; j < p; ++j) push_e(y_base + r, t, 1);
+    }
+    for (int i = 0; i + 1 < extra_n; ++i) {
+      push_e(y_base + k + i, y_base + k + i + 1, 1);
+    }
+
+    int ans = mf.flow(s, t);
+    assert(ans == k * p);
+    verify_flow_and_cut(n, s, t, added, mf, ans, true);
+  }
+
   // Large capacities at INT_MAX / LLONG_MAX / ULLONG_MAX / __int128 limits.
   {
     MaxFlow<int> mf_i(3);

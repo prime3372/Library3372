@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "library3372/internal/type_traits/is_integer.hpp"
+#include "library3372/math/isqrt.hpp"
 
 namespace library3372 {
 
@@ -44,6 +45,14 @@ class MaxFlow {
     int id = (int)edges_.size();
     edges_.push_back({from, to, cap, 0});
     if (cap > 1) all_unit_ = false;
+    constexpr unsigned long long cap_sum_limit = 1ULL << 60;
+    if (cap_sum_ < cap_sum_limit) {
+      if ((unsigned __int128)cap >= cap_sum_limit - cap_sum_) {
+        cap_sum_ = cap_sum_limit;
+      } else {
+        cap_sum_ += (unsigned long long)cap;
+      }
+    }
     return id;
   }
 
@@ -242,14 +251,22 @@ class MaxFlow {
     std::vector<int> iter(n_);
     std::vector<int> que(n_);
     auto has_cap = [](const GeneralEdge& e) { return e.cap > 0; };
-    long long nm = (long long)n_ + (long long)edges_.size();
+    long long m = (long long)edges_.size();
+    long long nm = (long long)n_ + m;
+    unsigned __int128 sq_c = (unsigned __int128)isqrt(cap_sum_);
+    unsigned __int128 dinic_bound = ((unsigned __int128)nm + cap_sum_) * sq_c;
+    unsigned __int128 sq_m = (unsigned __int128)isqrt((unsigned long long)m);
+    unsigned __int128 hlpp_bound =
+        (unsigned __int128)n_ * (unsigned __int128)n_ * sq_m;
+    bool allow_fallback = dinic_bound * 4 > hlpp_bound;
     long long dfs_calls = 0;
     int phases = 0;
     bool hit_limit = false;
 
     auto dfs = [&](auto& self, int v, Cap up) -> Cap {
       if (v == s) return up;
-      if ((++dfs_calls > 4LL * nm && phases >= 8) || dfs_calls > 16LL * nm) {
+      if (allow_fallback &&
+          ((++dfs_calls > 4LL * nm && phases >= 8) || dfs_calls > 16LL * nm)) {
         hit_limit = true;
         return 0;
       }
@@ -441,6 +458,7 @@ class MaxFlow {
   bool flow_called_ = false;
   bool built_ = false;
   bool csr_is_unit_ = false;
+  unsigned long long cap_sum_ = 0;
   std::vector<Edge> edges_;
   std::vector<int> start_;
   std::vector<int> edge_pos_;
