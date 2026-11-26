@@ -29,6 +29,10 @@ std::vector<T> convolution(const std::vector<T>& a,
 
 - $n = \lvert a \rvert + \lvert b \rvert$ として $O(n \log n + \log m)$
 
+### 補足
+
+(2): $m > 2 \times 10^9$ のときは、 $m \leq 2 \times 10^9$ のときと比べて定数倍が約 4 ～ 6 倍悪化します。
+
 ## 使用例
 
 ```cpp
