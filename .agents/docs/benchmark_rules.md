@@ -197,9 +197,9 @@ python3 scripts/run_benchmarks.py
       "timeout_sec": 10.0,
       "cases": [
         {
-          "name": "random_small",
+          "name": "random_large",
           "generator": "random.cpp",
-          "args": ["1000"],
+          "args": ["100000", "1000000"],
           "hash": "123456789",
           "solutions": {
             "fast": {
@@ -213,7 +213,7 @@ python3 scripts/run_benchmarks.py
             },
             "naive": {
               "status": "SKIP",
-              "reason": "N > 100000"
+              "reason": "N > 1000"
             }
           }
         }
