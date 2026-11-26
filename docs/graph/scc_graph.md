@@ -50,6 +50,10 @@ void SccGraph::build();
 
 - $O(n + m)$
 
+### 補足
+
+`build_ids()` を呼び出した後に `build()` を呼び出した場合は、`ids()` の計算結果を再利用して `groups()` 用の配列のみを $O(n)$ で構築します。
+
 ## build_ids
 
 ```cpp
@@ -99,6 +103,10 @@ const std::vector<int>& SccGraph::ids() const;
 
 - $O(1)$
 
+### 補足
+
+`add_edge()`、`build()`、`build_ids()` を呼び出すと、以前に取得した `ids()` の参照は無効になります。
+
 ## groups
 
 ```cpp
@@ -116,11 +124,9 @@ const std::vector<std::vector<int>>& SccGraph::groups() const;
 
 - $O(1)$
 
-## 補足
+### 補足
 
-`build_ids()` を呼び出した後に `build()` を呼び出した場合は、`ids()` の計算結果を再利用して `groups()` 用の配列のみを $O(n)$ で構築します。
-
-`add_edge()`、`build()`、`build_ids()` を呼び出すと、以前に取得した `ids()` や `groups()` の参照は無効になります。
+`add_edge()`、`build()`、`build_ids()` を呼び出すと、以前に取得した `groups()` の参照は無効になります。
 
 ## 使用例
 

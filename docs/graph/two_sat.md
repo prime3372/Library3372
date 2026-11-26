@@ -58,8 +58,6 @@ const std::vector<bool>& TwoSat::answer() const;
 
 直前の `satisfiable()` の呼び出しで構築された割り当てを長さ $n$ の配列として返します。
 
-`add_clause()` や `satisfiable()` を呼び出すと、以前に取得した `answer()` の参照は無効になります。
-
 ### 制約
 
 - `satisfiable()` を 1 回以上呼んでいる
@@ -69,6 +67,10 @@ const std::vector<bool>& TwoSat::answer() const;
 ### 計算量
 
 - $O(1)$
+
+### 補足
+
+`add_clause()` や `satisfiable()` を呼び出すと、以前に取得した `answer()` の参照は無効になります。
 
 ## 使用例
 
