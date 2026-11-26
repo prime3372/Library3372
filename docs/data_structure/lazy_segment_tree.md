@@ -34,22 +34,6 @@ class LazySegmentTree;
 - `composition` は `composition(const F&, const F&)` の形で呼び出し可能であり、`F` に変換可能な値を返す
 - `id` は `id()` の形で呼び出し可能であり、`F` に変換可能な値を返す
 
-### 補足
-
-$(S, \mathrm{op}, e, F, \mathrm{mapping}, \mathrm{composition}, \mathrm{id})$ が厳密な作用付きモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
-
-- 任意の時点における任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
-- 任意の要素に対し、その要素に適用された作用素を順に $f_0, f_1, \dots, f_{k-1}$ としたとき、任意の $0 \leq l < r \leq k$ について $f_{r-1} \circ \dots \circ f_{l+1} \circ f_l \in F$
-- $e \in S$
-- 任意の $x \in S$ について $ex = xe = x$
-- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
-- $\mathrm{id} \in F$
-- 任意の $f \in F$ について $\mathrm{id} \circ f = f \circ \mathrm{id} = f$
-- 任意の $f, g, h \in F$ について $f \circ g, g \circ h, (f \circ g) \circ h, f \circ (g \circ h) \in F$ ならば $(f \circ g) \circ h = f \circ (g \circ h)$
-- 任意の $f \in F$ と $x, y \in S$ について $xy, f(x), f(y), f(xy), f(x)f(y) \in S$ ならば $f(xy) = f(x)f(y)$
-- 任意の $f, g \in F$ と $x \in S$ について $g \circ f \in F$ かつ $f(x), g(f(x)), (g \circ f)(x) \in S$ ならば $(g \circ f)(x) = g(f(x))$
-- 任意の $x \in S$ について $\mathrm{id}(x) = x$
-
 ## コンストラクタ
 
 ```cpp
@@ -209,6 +193,22 @@ int LazySegmentTree::size() const;
 ### 計算量
 
 - $O(1)$
+
+## 補足
+
+$(S, \mathrm{op}, e, F, \mathrm{mapping}, \mathrm{composition}, \mathrm{id})$ が厳密な作用付きモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
+
+- 任意の時点における任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
+- 任意の要素に対し、その要素に適用された作用素を順に $f_0, f_1, \dots, f_{k-1}$ としたとき、任意の $0 \leq l < r \leq k$ について $f_{r-1} \circ \dots \circ f_{l+1} \circ f_l \in F$
+- $e \in S$
+- 任意の $x \in S$ について $ex = xe = x$
+- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
+- $\mathrm{id} \in F$
+- 任意の $f \in F$ について $\mathrm{id} \circ f = f \circ \mathrm{id} = f$
+- 任意の $f, g, h \in F$ について $f \circ g, g \circ h, (f \circ g) \circ h, f \circ (g \circ h) \in F$ ならば $(f \circ g) \circ h = f \circ (g \circ h)$
+- 任意の $f \in F$ と $x, y \in S$ について $xy, f(x), f(y), f(xy), f(x)f(y) \in S$ ならば $f(xy) = f(x)f(y)$
+- 任意の $f, g \in F$ と $x \in S$ について $g \circ f \in F$ かつ $f(x), g(f(x)), (g \circ f)(x) \in S$ ならば $(g \circ f)(x) = g(f(x))$
+- 任意の $x \in S$ について $\mathrm{id}(x) = x$
 
 ## 使用例
 

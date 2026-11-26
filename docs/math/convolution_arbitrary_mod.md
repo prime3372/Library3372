@@ -37,11 +37,6 @@ std::vector<T> convolution_arbitrary_mod(const std::vector<T>& a,
 
 - $n = \lvert a \rvert + \lvert b \rvert$ として $O(n \log n)$
 
-### 補足
-
-- $m < 2^{31}$ かつ $\lvert a \rvert + \lvert b \rvert - 1 > 2^{24}$ のときは、 $\lvert a \rvert + \lvert b \rvert - 1 \leq 2^{24}$ のときと比べて定数倍が約 1.1 ～ 1.2 倍悪化します。
-- (3), (4): $m \geq 2^{31}$ のときは、 $m < 2^{31}$ かつ $\lvert a \rvert + \lvert b \rvert - 1 \leq 2^{24}$ のときと比べて定数倍が約 1.5 倍悪化します。
-
 ## 使用例
 
 ```cpp

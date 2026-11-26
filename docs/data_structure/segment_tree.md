@@ -18,15 +18,6 @@ class SegmentTree;
 - `op` は `op(const S&, const S&)` の形で呼び出し可能であり、`S` に変換可能な値を返す
 - `e` は `e()` の形で呼び出し可能であり、`S` に変換可能な値を返す
 
-### 補足
-
-$(S, \mathrm{op}, e)$ が厳密なモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
-
-- 任意の時点における任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
-- $e \in S$
-- 任意の $x \in S$ について $ex = xe = x$
-- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
-
 ## コンストラクタ
 
 ```cpp
@@ -167,6 +158,15 @@ int SegmentTree::size() const;
 ### 計算量
 
 - $O(1)$
+
+## 補足
+
+$(S, \mathrm{op}, e)$ が厳密なモノイドをなさない場合でも、以下の条件をすべて満たすときは正しく動作します。
+
+- 任意の時点における任意の連続部分列 $a_l, a_{l+1}, \dots, a_{r-1}$ について $a_l a_{l+1} \cdots a_{r-1} \in S$
+- $e \in S$
+- 任意の $x \in S$ について $ex = xe = x$
+- 任意の $x, y, z \in S$ について $xy, yz, (xy)z, x(yz) \in S$ ならば $(xy)z = x(yz)$
 
 ## 使用例
 
