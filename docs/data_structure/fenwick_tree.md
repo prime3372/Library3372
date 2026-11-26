@@ -73,6 +73,22 @@ $a_p$ の値を $x$ に変更します。
 
 - $O(\log n)$
 
+## get
+
+```cpp
+T FenwickTree::get(int p) const;
+```
+
+$a_p$ を返します。
+
+### 制約
+
+- $0 \leq p < n$
+
+### 計算量
+
+- $O(\log n)$
+
 ## sum
 
 ```cpp
@@ -168,7 +184,7 @@ int main() {
 
   fw.add(2, 2);
   fw.set(0, 1);
-  std::cout << fw.sum(2, 3) << "\n";  // 6
+  std::cout << fw.get(2) << "\n";     // 6
   std::cout << fw.sum(0, 5) << "\n";  // 14
 
   int r = fw.max_right(0, 8);

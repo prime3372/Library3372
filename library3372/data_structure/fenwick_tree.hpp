@@ -9,20 +9,18 @@
 
 #include <bit>
 #include <cassert>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "library3372/internal/algebra/abelian_group.hpp"
 #include "library3372/internal/type_traits/is_integer.hpp"
-#include "library3372/internal/type_traits/to_unsigned.hpp"
 
 namespace library3372 {
 
 // Fenwick tree (Binary Indexed Tree)
 // https://en.wikipedia.org/wiki/Fenwick_tree
 template <typename T>
-  requires(std::is_object_v<T> && !std::is_const_v<T> &&
-           !std::is_volatile_v<T> && !std::is_same_v<T, bool>)
+  requires internal::AbelianGroup<T>
 class FenwickTree {
  public:
   FenwickTree() = default;
@@ -38,7 +36,7 @@ class FenwickTree {
     for (int i = 0; i < n_; ++i) data_[i + 1] = (Storage)a[i];
     for (int i = 1; i <= n_; ++i) {
       int j = i + (i & -i);
-      if (j <= n_) add_assign(data_[j], data_[i]);
+      if (j <= n_) Adapter::add_assign(data_[j], data_[i]);
     }
   }
 
@@ -49,12 +47,26 @@ class FenwickTree {
 
   void set(int p, const T& x) {
     assert(0 <= p && p < n_);
-    add_storage(p, sub_val((Storage)x, get_storage(p)));
+    add_storage(p, Adapter::sub_val((Storage)x, get_storage(p)));
+  }
+
+  T get(int p) const {
+    assert(0 <= p && p < n_);
+    return (T)get_storage(p);
   }
 
   T sum(int l, int r) const {
     assert(0 <= l && l <= r && r <= n_);
-    return (T)sub_val(prefix_sum(r), prefix_sum(l));
+    Storage s{};
+    while (r > l) {
+      Adapter::add_assign(s, data_[r]);
+      r -= r & -r;
+    }
+    while (l > r) {
+      Adapter::sub_assign(s, data_[l]);
+      l -= l & -l;
+    }
+    return (T)s;
   }
 
   int max_right(int l, const T& x) const
@@ -68,8 +80,8 @@ class FenwickTree {
     int r = 0;
     for (int d = 1 << (std::bit_width((unsigned int)n_) - 1); d > 0; d >>= 1) {
       if (r + d <= n_) {
-        Storage next_s = add_val(s, data_[r + d]);
-        if (r + d <= l || (T)sub_val(next_s, base) <= x) {
+        Storage next_s = Adapter::add_val(s, data_[r + d]);
+        if (r + d <= l || (T)Adapter::sub_val(next_s, base) <= x) {
           r += d;
           s = std::move(next_s);
         }
@@ -90,8 +102,8 @@ class FenwickTree {
     int l = 0;
     for (int d = 1 << (std::bit_width((unsigned int)r) - 1); d > 0; d >>= 1) {
       if (l + d < r) {
-        Storage next_s = add_val(s, data_[l + d]);
-        if (!((T)sub_val(s_r, next_s) <= x)) {
+        Storage next_s = Adapter::add_val(s, data_[l + d]);
+        if (!((T)Adapter::sub_val(s_r, next_s) <= x)) {
           l += d;
           s = std::move(next_s);
         }
@@ -103,47 +115,25 @@ class FenwickTree {
   int size() const { return n_; }
 
  private:
-  using Storage = internal::to_unsigned_t<T>;
-
-  static void add_assign(Storage& a, const Storage& b) {
-    if constexpr (sizeof(Storage) < sizeof(int) &&
-                  internal::is_integer_v<Storage>) {
-      a = (Storage)(a + b);
-    } else {
-      a += b;
-    }
-  }
-
-  static Storage add_val(Storage a, const Storage& b) {
-    add_assign(a, b);
-    return a;
-  }
-
-  static Storage sub_val(Storage a, const Storage& b) {
-    if constexpr (sizeof(Storage) < sizeof(int) &&
-                  internal::is_integer_v<Storage>) {
-      a = (Storage)(a - b);
-    } else {
-      a -= b;
-    }
-    return a;
-  }
+  using Adapter = internal::AbelianGroupAdapter<T>;
+  using Storage = typename Adapter::Storage;
 
   void add_storage(int p, const Storage& x) {
-    for (int i = p + 1; i <= n_; i += i & -i) add_assign(data_[i], x);
+    for (int i = p + 1; i <= n_; i += i & -i) Adapter::add_assign(data_[i], x);
   }
 
   Storage get_storage(int p) const {
     int i = p + 1;
     int lca = i - (i & -i);
     Storage sub{};
-    for (int j = i - 1; j > lca; j -= j & -j) add_assign(sub, data_[j]);
-    return sub_val(data_[i], sub);
+    for (int j = i - 1; j > lca; j -= j & -j)
+      Adapter::add_assign(sub, data_[j]);
+    return Adapter::sub_val(data_[i], sub);
   }
 
   Storage prefix_sum(int r) const {
     Storage s{};
-    for (int i = r; i > 0; i -= i & -i) add_assign(s, data_[i]);
+    for (int i = r; i > 0; i -= i & -i) Adapter::add_assign(s, data_[i]);
     return s;
   }
 
