@@ -503,6 +503,8 @@ def run_task(
                     runs,
                     timeout_sec,
                 )
+            if not case_results:
+                continue
             case_report, case_ok = build_case_report(case, sol_names, case_results)
             case_reports.append(case_report)
             if not case_ok:
