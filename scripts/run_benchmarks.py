@@ -2,6 +2,7 @@
 """Run performance benchmarks for tasks under benchmarks/<category>/<task>/."""
 
 import argparse
+import fnmatch
 import json
 import math
 import resource
@@ -54,6 +55,36 @@ class CaseSolResult:
     detail: str
     answer_hash: str | None
     medians_sec: dict[str, float]
+
+
+@dataclass(frozen=True)
+class FilterSpec:
+    case_includes: tuple[str, ...]
+    case_excludes: tuple[str, ...]
+    sol_includes: tuple[str, ...]
+    sol_excludes: tuple[str, ...]
+
+    @property
+    def active(self) -> bool:
+        return bool(
+            self.case_includes
+            or self.case_excludes
+            or self.sol_includes
+            or self.sol_excludes
+        )
+
+
+def matches_patterns(
+    candidates: tuple[str, ...],
+    includes: tuple[str, ...],
+    excludes: tuple[str, ...],
+) -> bool:
+    """Return whether candidates pass case-sensitive glob include and exclude filters."""
+    if includes and not any(fnmatch.fnmatchcase(c, pat) for c in candidates for pat in includes):
+        return False
+    if excludes and any(fnmatch.fnmatchcase(c, pat) for c in candidates for pat in excludes):
+        return False
+    return True
 
 
 def parse_solution_output(stdout: str) -> RunOutput:
@@ -403,21 +434,16 @@ def format_task_path(task_dir: Path) -> str:
         return str(task_dir)
 
 
-def run_task(
+def prepare_task(
     task_dir: Path,
     runs_override: int | None,
     timeout_override: float | None,
-    case_filters: set[str],
-    sol_filters: set[str],
-) -> tuple[dict[str, Any], bool]:
-    """Compile, generate inputs, execute benchmarks, and return a JSON report for one task."""
+    filters: FilterSpec,
+) -> tuple[str, int, float, list[CaseSpec], list[tuple[str, Path]]]:
+    """Load task config, discover solutions, and apply case/solution filters."""
     rel_task = format_task_path(task_dir)
 
-    runs, timeout_sec, cases = load_task_config(task_dir, runs_override, timeout_override)
-    if case_filters:
-        cases = [c for c in cases if c.name in case_filters]
-        if not cases:
-            raise ValueError(f"{rel_task}: no cases matched filter {sorted(case_filters)}")
+    runs, timeout_sec, all_cases = load_task_config(task_dir, runs_override, timeout_override)
 
     solutions_dir = task_dir / "solutions"
     if not solutions_dir.is_dir():
@@ -427,15 +453,29 @@ def run_task(
     if not sol_sources:
         raise ValueError(f"{rel_task}: no .cpp files found in solutions/")
 
+    cases = [
+        c
+        for c in all_cases
+        if matches_patterns((c.name,), filters.case_includes, filters.case_excludes)
+    ]
     solutions: list[tuple[str, Path]] = []
     for src in sol_sources:
         sol_name = src.relative_to(solutions_dir).with_suffix("").as_posix()
-        if not sol_filters or sol_name in sol_filters or src.name in sol_filters:
+        sol_rel = src.relative_to(solutions_dir).as_posix()
+        if matches_patterns((sol_name, sol_rel, src.name), filters.sol_includes, filters.sol_excludes):
             solutions.append((sol_name, src))
 
-    if not solutions:
-        raise ValueError(f"{rel_task}: no solutions matched filter {sorted(sol_filters)}")
+    return rel_task, runs, timeout_sec, cases, solutions
 
+
+def run_task(
+    rel_task: str,
+    runs: int,
+    timeout_sec: float,
+    cases: list[CaseSpec],
+    solutions: list[tuple[str, Path]],
+) -> tuple[dict[str, Any], bool]:
+    """Compile, generate inputs, execute benchmarks, and return a JSON report for one task."""
     task_ok = True
     case_reports: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="library3372_bench_") as tmp:
@@ -520,8 +560,32 @@ def main() -> int:
     )
     parser.add_argument("--runs", type=int, default=None, help="Override repetitions per case.")
     parser.add_argument("--timeout", type=float, default=None, help="Override timeout in seconds.")
-    parser.add_argument("-c", "--case", action="append", default=[], help="Filter by case name.")
-    parser.add_argument("-s", "--solution", action="append", default=[], help="Filter by solution name.")
+    parser.add_argument(
+        "-c",
+        "--case",
+        action="append",
+        default=[],
+        help="Filter by case name or glob pattern.",
+    )
+    parser.add_argument(
+        "--exclude-case",
+        action="append",
+        default=[],
+        help="Exclude cases matching name or glob pattern.",
+    )
+    parser.add_argument(
+        "-s",
+        "--solution",
+        action="append",
+        default=[],
+        help="Filter by solution name, relative path, or glob pattern.",
+    )
+    parser.add_argument(
+        "--exclude-solution",
+        action="append",
+        default=[],
+        help="Exclude solutions matching name, relative path, or glob pattern.",
+    )
     args = parser.parse_args()
 
     if args.runs is not None and args.runs < 1:
@@ -544,11 +608,32 @@ def main() -> int:
         print(dumps_json({"ok": True, "tasks": []}))
         return 0
 
+    filters = FilterSpec(
+        case_includes=tuple(args.case),
+        case_excludes=tuple(args.exclude_case),
+        sol_includes=tuple(args.solution),
+        sol_excludes=tuple(args.exclude_solution),
+    )
+
     all_ok = True
+    any_case_matched = False
+    any_sol_matched = False
+    any_task_ran = False
     task_reports: list[dict[str, Any]] = []
     for task_dir in tasks:
         try:
-            task_report, ok = run_task(task_dir, args.runs, args.timeout, set(args.case), set(args.solution))
+            rel_task, runs, timeout_sec, cases, solutions = prepare_task(
+                task_dir, args.runs, args.timeout, filters
+            )
+            if cases:
+                any_case_matched = True
+            if solutions:
+                any_sol_matched = True
+            if not cases or not solutions:
+                continue
+
+            any_task_ran = True
+            task_report, ok = run_task(rel_task, runs, timeout_sec, cases, solutions)
             task_reports.append(task_report)
             if not ok:
                 all_ok = False
@@ -558,6 +643,24 @@ def main() -> int:
                 "error": str(exc),
             })
             all_ok = False
+
+    if filters.active and not any_task_ran:
+        if not any_case_matched:
+            if filters.case_includes:
+                msg = f"No cases matched filter {sorted(set(filters.case_includes))}"
+            else:
+                msg = "All cases were excluded by --exclude-case"
+        elif not any_sol_matched:
+            if filters.sol_includes:
+                msg = f"No solutions matched filter {sorted(set(filters.sol_includes))}"
+            else:
+                msg = "All solutions were excluded by --exclude-solution"
+        else:
+            msg = "No tasks matched both case and solution filters"
+        print(f"Error: {msg}", file=sys.stderr)
+        if task_reports:
+            print(dumps_json({"ok": False, "tasks": task_reports}))
+        return 1
 
     print(dumps_json({"ok": all_ok, "tasks": task_reports}))
     return 0 if all_ok else 1
